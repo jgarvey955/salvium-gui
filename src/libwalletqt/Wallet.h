@@ -406,6 +406,7 @@ public:
     Q_INVOKABLE YieldInfo * getYieldInfo();
 
     Q_INVOKABLE QStringList getAssetTypes();
+    Q_INVOKABLE quint64 blockchainHeight() const;
 
     // new property getter
     QStringList assetTypes() const;

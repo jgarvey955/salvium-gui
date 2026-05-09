@@ -12,6 +12,10 @@ endif
 
 builddir := build
 topdir := ../..
+BOOST_SYSTEM_LIBRARY ?= $(firstword $(wildcard /usr/lib/x86_64-linux-gnu/libboost_system.so /usr/lib/x86_64-linux-gnu/libboost_system.so.*))
+ifneq ($(BOOST_SYSTEM_LIBRARY),)
+  BOOST_SYSTEM_CMAKE_FLAGS := -DBoost_SYSTEM_LIBRARY_RELEASE=$(BOOST_SYSTEM_LIBRARY) -DBoost_SYSTEM_LIBRARY_DEBUG=$(BOOST_SYSTEM_LIBRARY)
+endif
 ifeq ($(USE_SINGLE_BUILDDIR), OFF)
   os := $(shell echo  `uname | sed -e 's|[:/\\ \(\)]|_|g'`)
   builddir := $(builddir)/$(os)
@@ -29,9 +33,9 @@ else
 endif
 
 default:
-	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release .. && $(MAKE)
+	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(BOOST_SYSTEM_CMAKE_FLAGS) .. && $(MAKE)
 debug:
-	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},ON) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D CMAKE_BUILD_TYPE=Debug .. && $(MAKE) VERBOSE=1
+	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},ON) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D CMAKE_BUILD_TYPE=Debug $(BOOST_SYSTEM_CMAKE_FLAGS) .. && $(MAKE) VERBOSE=1
 debug-static:
 	mkdir -p build && cd build && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},ON) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D CMAKE_BUILD_TYPE=Debug .. && $(MAKE) VERBOSE=1
 

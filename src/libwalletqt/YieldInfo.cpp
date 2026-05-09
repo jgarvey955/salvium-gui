@@ -69,6 +69,21 @@ quint64 YieldInfo::yield_per_stake() const
     return m_pYI->yield_per_stake();
 }
 
+quint64 YieldInfo::total_accrued_from_past_completions() const
+{
+    return m_pYI->total_accrued_from_past_completions();
+}
+
+quint64 YieldInfo::currently_staked() const
+{
+    return m_pYI->currently_staked();
+}
+
+quint64 YieldInfo::accrued_from_current_stake() const
+{
+    return m_pYI->accrued_from_current_stake();
+}
+
 QString YieldInfo::period() const
 {
   // Take the number of entries and convert to a human-readable period

@@ -155,6 +155,69 @@ Rectangle {
         }
 
         RowLayout {
+            Layout.topMargin: 5
+
+            MoneroComponents.TextPlain {
+                text: qsTr("Total accrued from past completions: ") + translationManager.emptyString
+                Layout.fillWidth: true
+                color: MoneroComponents.Style.defaultFontColor
+                font.pixelSize: 16
+                font.family: MoneroComponents.Style.fontRegular.name
+                themeTransition: false
+            }
+
+            MoneroComponents.TextPlain {
+                id: totalAccruedFromPastCompletions
+                Layout.rightMargin: 20
+                font.family: MoneroComponents.Style.fontMonoRegular.name;
+                font.pixelSize: 16
+                color: MoneroComponents.Style.defaultFontColor
+            }
+        }
+
+        RowLayout {
+            Layout.topMargin: 5
+
+            MoneroComponents.TextPlain {
+                text: qsTr("Currently staked: ") + translationManager.emptyString
+                Layout.fillWidth: true
+                color: MoneroComponents.Style.defaultFontColor
+                font.pixelSize: 16
+                font.family: MoneroComponents.Style.fontRegular.name
+                themeTransition: false
+            }
+
+            MoneroComponents.TextPlain {
+                id: currentlyStaked
+                Layout.rightMargin: 20
+                font.family: MoneroComponents.Style.fontMonoRegular.name;
+                font.pixelSize: 16
+                color: MoneroComponents.Style.defaultFontColor
+            }
+        }
+
+        RowLayout {
+            Layout.topMargin: 5
+
+            MoneroComponents.TextPlain {
+                text: qsTr("Accrued from current stake: ") + translationManager.emptyString
+                Layout.fillWidth: true
+                color: MoneroComponents.Style.defaultFontColor
+                font.pixelSize: 16
+                font.family: MoneroComponents.Style.fontRegular.name
+                themeTransition: false
+            }
+
+            MoneroComponents.TextPlain {
+                id: accruedFromCurrentStake
+                Layout.rightMargin: 20
+                font.family: MoneroComponents.Style.fontMonoRegular.name;
+                font.pixelSize: 16
+                color: MoneroComponents.Style.defaultFontColor
+            }
+        }
+
+        RowLayout {
             Layout.topMargin: 25
             Layout.preferredHeight: 20
             Layout.preferredWidth: parent.width - root.sideMargin
@@ -342,14 +405,101 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onClicked: {
-                        if(root.sortBy !== "blockheight") {
-                            root.sortDirection = true;
-                        } else {
-                            root.sortDirection = !root.sortDirection
-                        }
+                        root.toggleSort("blockheight");
+                    }
+                }
+            }
 
-                        root.sortBy = "blockheight";
-                        root.updateSort();
+            Rectangle {
+                visible: sortAndFilter.collapsed
+                id: sortBurnt
+                color: "transparent"
+                Layout.preferredWidth: sortBurntText.width + 42
+                Layout.preferredHeight: 20
+
+                RowLayout {
+                    clip: true
+                    anchors.fill: parent
+
+                    MoneroComponents.TextPlain {
+                        id: sortBurntText
+                        font.family: MoneroComponents.Style.fontRegular.name
+                        font.pixelSize: 15
+                        text: qsTr("Amount staked") + translationManager.emptyString
+                        color: root.sortBy === "burnt" ? MoneroComponents.Style.defaultFontColor : MoneroComponents.Style.dimmedFontColor
+                        themeTransition: false
+                    }
+
+                    MoneroEffects.ImageMask {
+                        height: 8
+                        width: 12
+                        visible: root.sortBy === "burnt"
+                        opacity: root.sortBy === "burnt" ? 1 : 0.2
+                        image: "qrc:///images/whiteDropIndicator.png"
+                        fontAwesomeFallbackIcon: FontAwesome.arrowDown
+                        fontAwesomeFallbackSize: 14
+                        color: MoneroComponents.Style.defaultFontColor
+                        rotation: root.sortBy === "burnt" ? (root.sortDirection ? 0 : 180) : 0
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                        root.toggleSort("burnt");
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: sortAndFilter.collapsed
+                id: sortYield
+                color: "transparent"
+                Layout.preferredWidth: sortYieldText.width + 42
+                Layout.preferredHeight: 20
+
+                RowLayout {
+                    clip: true
+                    anchors.fill: parent
+
+                    MoneroComponents.TextPlain {
+                        id: sortYieldText
+                        font.family: MoneroComponents.Style.fontRegular.name
+                        font.pixelSize: 15
+                        text: qsTr("Amount accrued") + translationManager.emptyString
+                        color: root.sortBy === "yield" ? MoneroComponents.Style.defaultFontColor : MoneroComponents.Style.dimmedFontColor
+                        themeTransition: false
+                    }
+
+                    MoneroEffects.ImageMask {
+                        height: 8
+                        width: 12
+                        visible: root.sortBy === "yield"
+                        opacity: root.sortBy === "yield" ? 1 : 0.2
+                        image: "qrc:///images/whiteDropIndicator.png"
+                        fontAwesomeFallbackIcon: FontAwesome.arrowDown
+                        fontAwesomeFallbackSize: 14
+                        color: MoneroComponents.Style.defaultFontColor
+                        rotation: root.sortBy === "yield" ? (root.sortDirection ? 0 : 180) : 0
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                        root.toggleSort("yield");
                     }
                 }
             }
@@ -514,6 +664,7 @@ Rectangle {
             delegate: Rectangle {
                 id: delegate
                 property bool collapsed: root.txDataCollapsed.indexOf(hash) >= 0 ? true : false
+                property bool maturesNow: maturityHeight === currentHeight
                 anchors.left: parent ? parent.left : undefined
                 anchors.right: parent ? parent.right : undefined
                 height: {
@@ -534,7 +685,7 @@ Rectangle {
 
                     MoneroComponents.InlineButton {
                         buttonColor: {
-                            if (isComplete) return MoneroComponents.Style.blackTheme ? "#00D9CC" : "#00CBC0"
+                            if (isComplete || maturesNow) return MoneroComponents.Style.blackTheme ? "#00D9CC" : "#00CBC0"
                             return MoneroComponents.Style.blackTheme ? "#06FFFFFF" : "#04000000"
                         }
                         fontFamily: FontAwesome.fontFamilySolid
@@ -542,12 +693,14 @@ Rectangle {
                         fontStyleName: "Solid"
                         text: {
                             if (isComplete) return FontAwesome.checkCircle;
+                            if (maturesNow) return FontAwesome.arrowRight;
                             return FontAwesome.hourglassHalf;
                         }
                         textColor: "#00D9CC"
                         visible: true
                         tooltip: {
-                            if (isComplete) return qsTr("complete") + translationManager.emptyString;   
+                            if (isComplete) return qsTr("complete") + translationManager.emptyString;
+                            if (maturesNow) return qsTr("matures this block") + translationManager.emptyString;
                             return qsTr("active") + translationManager.emptyString;
                         }
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -614,8 +767,7 @@ Rectangle {
                                     font.pixelSize: 15
                                     text: {
                                         if (isComplete) return blockheight;
-                                        var stakePeriod = (persistentSettings.nettype == NetworkType.MAINNET) ? 21600 : 20;
-                                        return blockheight + " (" + (blockheight + stakePeriod) + ")";
+                                        return blockheight + " (" + maturityHeight + ")";
                                     }
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
@@ -866,9 +1018,9 @@ Rectangle {
                         height: 8
                         width: 12
                         image: "qrc:///images/whiteDropIndicator.png"
-                        rotation: delegate.collapsed ? 180 : 0
+                        rotation: maturesNow ? 270 : (delegate.collapsed ? 180 : 0)
                         color: MoneroComponents.Style.defaultFontColor
-                        fontAwesomeFallbackIcon: FontAwesome.arrowDown
+                        fontAwesomeFallbackIcon: maturesNow ? FontAwesome.arrowRight : FontAwesome.arrowDown
                         fontAwesomeFallbackSize: 14
                     }
                 }
@@ -1005,13 +1157,26 @@ Rectangle {
         // applying sorts
         root.txOffset = 0;
         root.txData.sort(function(a, b) {
-            return a[root.sortBy] - b[root.sortBy];
+            var aValue = typeof a[root.sortBy] !== "undefined" ? a[root.sortBy] : 0;
+            var bValue = typeof b[root.sortBy] !== "undefined" ? b[root.sortBy] : 0;
+            return aValue - bValue;
         });
 
         if(root.sortDirection)
             root.txData.reverse();
 
         root.updateDisplay(root.txOffset, root.txMax);
+    }
+
+    function toggleSort(field) {
+        if (root.sortBy !== field) {
+            root.sortDirection = true;
+        } else {
+            root.sortDirection = !root.sortDirection;
+        }
+
+        root.sortBy = field;
+        root.updateSort();
     }
 
     function updateDisplay(tx_offset, tx_max) {
@@ -1058,20 +1223,21 @@ Rectangle {
         var count = _model.length;
         root.txModelData = [];
 
-        var currentHeight = walletManager.blockchainHeight();
+        var currentHeight = currentWallet ? currentWallet.blockchainHeight() : walletManager.blockchainHeight();
         var stakePeriod = (persistentSettings.nettype == NetworkType.MAINNET) ? 21600 : 20;
-        var maturedHeight = (currentHeight > stakePeriod) ? currentHeight - stakePeriod : 0;
-
         for (var i = 0; i < count; ++i) {
+            var maturityHeight = _model[i].blockheight + stakePeriod;
 
             root.txModelData.push({"i": i,
                 "blockheight": _model[i].blockheight,
-                "isActive": (_model[i].blockheight > maturedHeight),
-                "isComplete": (_model[i].blockheight <= maturedHeight),
+                "currentHeight": currentHeight,
+                "maturityHeight": maturityHeight,
+                "isActive": (maturityHeight > currentHeight),
+                "isComplete": (maturityHeight < currentHeight),
                 "burnt": _model[i].burnt,
                 "yield": _model[i].yield,
                 "hash": _model[i].hash,
-                "asset_type" : _model[1].asset_type
+                "asset_type" : _model[i].asset_type
             });
         }
 
@@ -1197,6 +1363,9 @@ Rectangle {
                 coinsBurnt.text = walletManager.displayAmount(yield_info.burnt) + " SAL1";
                 coinsLocked.text = walletManager.displayAmount(yield_info.locked) + " SAL1";
                 coinsAccrued.text = walletManager.displayAmount(yield_info.yield) + " SAL1";
+                totalAccruedFromPastCompletions.text = walletManager.displayAmount(yield_info.total_accrued_from_past_completions) + " SAL1";
+                currentlyStaked.text = walletManager.displayAmount(yield_info.currently_staked) + " SAL1";
+                accruedFromCurrentStake.text = walletManager.displayAmount(yield_info.accrued_from_current_stake) + " SAL1";
                 root.model = yield_info.payouts;
             } else {
                 root.model = "[]";
@@ -1228,4 +1397,3 @@ Rectangle {
         root.txDataCollapsed = [];
     }
 }
-

@@ -475,6 +475,11 @@ quint64 Wallet::blockChainHeight() const
     return m_walletImpl->blockChainHeight();
 }
 
+quint64 Wallet::blockchainHeight() const
+{
+    return blockChainHeight();
+}
+
 quint64 Wallet::daemonBlockChainHeight() const
 {
     // cache daemon blockchain height for some time (60 seconds by default)

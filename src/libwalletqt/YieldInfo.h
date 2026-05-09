@@ -46,6 +46,9 @@ class YieldInfo : public QObject
     Q_PROPERTY(quint64 supply READ supply)
     Q_PROPERTY(quint64 yield READ yield)
     Q_PROPERTY(quint64 yield_per_stake READ yield_per_stake)
+    Q_PROPERTY(quint64 total_accrued_from_past_completions READ total_accrued_from_past_completions)
+    Q_PROPERTY(quint64 currently_staked READ currently_staked)
+    Q_PROPERTY(quint64 accrued_from_current_stake READ accrued_from_current_stake)
     Q_PROPERTY(QString period READ period)
     Q_PROPERTY(QString payouts READ payouts)
 
@@ -64,6 +67,9 @@ public:
     quint64 supply() const;
     quint64 yield() const;
     quint64 yield_per_stake() const;
+    quint64 total_accrued_from_past_completions() const;
+    quint64 currently_staked() const;
+    quint64 accrued_from_current_stake() const;
     QString period() const;
     QString payouts() const;
 
