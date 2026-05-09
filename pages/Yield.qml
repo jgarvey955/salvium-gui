@@ -50,7 +50,7 @@ Rectangle {
     property var model
     property int sideMargin: 50
     property var initialized: false
-    property int txMax: Math.max(5, ((appWindow.height - 440) / 60))
+    property int txMax: Math.max(3, Math.floor((appWindow.height - 540) / 60))
     property int txOffset: 0
     property int txPage: (txOffset / txMax) + 1
     property int txCount: 0
@@ -1073,6 +1073,11 @@ Rectangle {
                 themeTransitionBlackColor: MoneroComponents.Style._b_dimmedFontColor
                 themeTransitionWhiteColor: MoneroComponents.Style._w_dimmedFontColor
             }
+        }
+
+        Item {
+            Layout.preferredHeight: 32
+            Layout.fillWidth: true
         }
     }
 
