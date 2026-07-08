@@ -151,8 +151,9 @@ Rectangle {
                         color: itemMouseArea.containsMouse ? MoneroComponents.Style.titleBarButtonHoverColor : "transparent"
 
                         function doSend() {
-                            console.log("Sending to: ", address +" "+ paymentId);
-                            middlePanel.sendTo(address, paymentId);
+                            var destinationAddress = currentWallet.addressBookModel.displayAddress(index);
+                            console.log("Sending to: ", destinationAddress +" "+ paymentId);
+                            middlePanel.sendTo(destinationAddress, paymentId);
                             leftPanel.selectItem(middlePanel.state)
                         }
 
@@ -197,7 +198,7 @@ Rectangle {
 
                                 fontSize: 16
                                 fontFamily: MoneroComponents.Style.fontMonoRegular.name;
-                                text: TxUtils.addressTruncatePretty(address, mainLayout.width < 540 ? 1 : (mainLayout.width < 700 ? 2 : 3));
+                                text: TxUtils.addressTruncatePretty(currentWallet.addressBookModel.displayAddress(index), mainLayout.width < 540 ? 1 : (mainLayout.width < 700 ? 2 : 3));
                             }
 
                             MouseArea {
@@ -245,7 +246,7 @@ Rectangle {
                                 Layout.preferredHeight: 21
                                 tooltip: qsTr("See transactions") + translationManager.emptyString
 
-                                onClicked: doSearchInHistory(address)
+                                onClicked: doSearchInHistory(currentWallet.addressBookModel.displayAddress(index))
                             }
 
                             MoneroComponents.IconButton {
@@ -262,7 +263,7 @@ Rectangle {
 
                                 onClicked: {
                                     addressBookListView.currentIndex = index;
-                                    root.showEditAddress(address, description);
+                                    root.showEditAddress(currentWallet.addressBookModel.displayAddress(index), description);
                                 }
                             }
 
@@ -280,7 +281,7 @@ Rectangle {
 
                                 onClicked: {
                                     console.log("Address copied to clipboard");
-                                    clipboard.setText(address);
+                                    clipboard.setText(currentWallet.addressBookModel.displayAddress(index));
                                     appWindow.showStatusMessage(qsTr("Address copied to clipboard"), 3);
                                 }
                             }

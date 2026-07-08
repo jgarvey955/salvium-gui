@@ -43,6 +43,8 @@ Rectangle {
     property int threads: idealThreadCount / 2
     property alias stopMiningEnabled: stopSoloMinerButton.enabled
     property string args: ""
+    property bool p2poolUpdateInProgress: false
+    property bool restartP2PoolAfterUpdate: false
     ColumnLayout {
         id: mainLayout
         Layout.fillWidth: true
@@ -350,6 +352,21 @@ Rectangle {
                             update()
                         }
                     }
+
+                    MoneroComponents.StandardButton {
+                        visible: persistentSettings.allow_p2pool_mining
+                        id: updateP2PoolButton
+                        small: true
+                        primary: false
+                        text: qsTr("Update") + translationManager.emptyString
+                        enabled: !p2poolUpdateInProgress
+                        onClicked: {
+                            p2poolUpdateInProgress = true;
+                            statusMessageText.text = qsTr("Checking P2Pool updates...") + translationManager.emptyString;
+                            statusMessage.visible = true;
+                            p2poolManager.checkForUpdates();
+                        }
+                    }
                 }
             }
 
@@ -566,8 +583,8 @@ Rectangle {
         }
         appWindow.isMining = isMining;
         updateStatusText(hashrate)
-        startSoloMinerButton.enabled = !appWindow.isMining && daemonReady
-        stopSoloMinerButton.enabled = !startSoloMinerButton.enabled && daemonReady
+        startSoloMinerButton.enabled = !appWindow.isMining && daemonReady && !p2poolUpdateInProgress
+        stopSoloMinerButton.enabled = appWindow.isMining && daemonReady && !p2poolUpdateInProgress
     }
 
     function update() {
@@ -661,8 +678,12 @@ allArgs = allArgs.filter( ( el ) => !defaultArgs.includes( el.split(" ")[0] ) )
     }
 
     function p2poolDownloadFailed(errorCode) {
+        var wasUpdating = p2poolUpdateInProgress
+        p2poolUpdateInProgress = false
         statusMessage.visible = false
-        errorPopup.title = qsTr("P2Pool Installation Failed") + translationManager.emptyString;
+        var shouldRestart = wasUpdating && restartP2PoolAfterUpdate
+        restartP2PoolAfterUpdate = false
+        errorPopup.title = wasUpdating ? qsTr("P2Pool Update Failed") + translationManager.emptyString : qsTr("P2Pool Installation Failed") + translationManager.emptyString;
         switch (errorCode) {
             case P2PoolManager.HashVerificationFailed:
                 errorPopup.text = qsTr("Hash verification failed.") + translationManager.emptyString;
@@ -681,16 +702,72 @@ allArgs = allArgs.filter( ( el ) => !defaultArgs.includes( el.split(" ")[0] ) )
         }
         errorPopup.icon = StandardIcon.Critical
         errorPopup.open()
-        update()
+        if (shouldRestart && p2poolManager.isInstalled()) {
+            startP2Pool()
+        }
+        else {
+            update()
+        }
     }
 
     function p2poolDownloadSucceeded() {
+        var wasUpdating = p2poolUpdateInProgress
+        p2poolUpdateInProgress = false
         statusMessage.visible = false
-        informationPopup.title  = qsTr("P2Pool Installation Succeeded") + translationManager.emptyString;
-        informationPopup.text = qsTr("P2Pool has successfully installed.");
-        informationPopup.icon = StandardIcon.Critical
+        var shouldRestart = wasUpdating && restartP2PoolAfterUpdate
+        restartP2PoolAfterUpdate = false
+        informationPopup.title  = wasUpdating ? qsTr("P2Pool Update Succeeded") + translationManager.emptyString : qsTr("P2Pool Installation Succeeded") + translationManager.emptyString;
+        informationPopup.text = wasUpdating ? qsTr("P2Pool has successfully updated.") + translationManager.emptyString : qsTr("P2Pool has successfully installed.") + translationManager.emptyString;
+        informationPopup.icon = StandardIcon.Information
         informationPopup.open()
-        update()
+        if (shouldRestart) {
+            startP2Pool()
+        }
+        else {
+            update()
+        }
+    }
+
+    function p2poolUpdateAvailable(currentVersion, latestVersion) {
+        p2poolUpdateInProgress = false
+        statusMessage.visible = false
+        confirmationDialog.title = qsTr("P2Pool update available") + translationManager.emptyString;
+        confirmationDialog.text = qsTr("Installed version: %1<br>Latest version: %2<br><br>Update P2Pool now?").arg(currentVersion).arg(latestVersion) + translationManager.emptyString;
+        confirmationDialog.icon = StandardIcon.Question;
+        confirmationDialog.cancelText = qsTr("No") + translationManager.emptyString;
+        confirmationDialog.okText = qsTr("Update") + translationManager.emptyString;
+        confirmationDialog.onAcceptedCallback = function() {
+            p2poolUpdateInProgress = true;
+            restartP2PoolAfterUpdate = appWindow.isMining && persistentSettings.allow_p2pool_mining;
+            statusMessageText.text = qsTr("Updating P2Pool...") + translationManager.emptyString;
+            statusMessage.visible = true;
+            if (restartP2PoolAfterUpdate) {
+                p2poolManager.exit();
+            }
+            p2poolManager.update();
+        }
+        confirmationDialog.onRejectedCallback = function() {
+            restartP2PoolAfterUpdate = false;
+        };
+        confirmationDialog.open();
+    }
+
+    function p2poolUpdateNotAvailable(currentVersion) {
+        p2poolUpdateInProgress = false
+        statusMessage.visible = false
+        informationPopup.title = qsTr("P2Pool is up to date") + translationManager.emptyString;
+        informationPopup.text = qsTr("Installed version: %1").arg(currentVersion) + translationManager.emptyString;
+        informationPopup.icon = StandardIcon.Information
+        informationPopup.open()
+    }
+
+    function p2poolUpdateCheckFailed() {
+        p2poolUpdateInProgress = false
+        statusMessage.visible = false
+        errorPopup.title = qsTr("P2Pool Update Check Failed") + translationManager.emptyString;
+        errorPopup.text = qsTr("Could not check the latest P2Pool version.") + translationManager.emptyString;
+        errorPopup.icon = StandardIcon.Critical
+        errorPopup.open()
     }
 
     Component.onCompleted: {
@@ -698,5 +775,8 @@ allArgs = allArgs.filter( ( el ) => !defaultArgs.includes( el.split(" ")[0] ) )
         p2poolManager.p2poolStatus.connect(onMiningStatus);
         p2poolManager.p2poolDownloadFailure.connect(p2poolDownloadFailed);
         p2poolManager.p2poolDownloadSuccess.connect(p2poolDownloadSucceeded);
+        p2poolManager.p2poolUpdateAvailable.connect(p2poolUpdateAvailable);
+        p2poolManager.p2poolUpdateNotAvailable.connect(p2poolUpdateNotAvailable);
+        p2poolManager.p2poolUpdateCheckFailure.connect(p2poolUpdateCheckFailed);
     }
 }

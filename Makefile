@@ -56,7 +56,7 @@ release-linux-ppc64le:
 	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D ARCH="ppc64le" -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
 
 release-static:
-	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
+	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D ARCH=$(or ${ARCH},default) -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
 
 release-static-mac-x86_64:
 	mkdir -p $(builddir)/release &&	cd $(builddir)/release && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D ARCH="x86-64" -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)

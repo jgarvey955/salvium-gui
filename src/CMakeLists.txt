@@ -94,8 +94,10 @@ message(STATUS "OpenGL: libraries at ${OPENGL_LIBRARIES}")
 target_include_directories(salvium-wallet-gui PUBLIC ${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 
 target_include_directories(salvium-wallet-gui PUBLIC
-	${CMAKE_SOURCE_DIR}/salvium/include
+    ${CMAKE_SOURCE_DIR}/salvium/include
     ${CMAKE_SOURCE_DIR}/salvium/src
+    ${CMAKE_SOURCE_DIR}/salvium/src/crypto
+    ${CMAKE_SOURCE_DIR}/salvium/external/mx25519/include
     ${CMAKE_SOURCE_DIR}/salvium/external/easylogging++
     ${CMAKE_SOURCE_DIR}/salvium/contrib/epee/include
     ${CMAKE_SOURCE_DIR}/salvium/external/qrcodegen

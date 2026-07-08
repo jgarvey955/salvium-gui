@@ -64,7 +64,7 @@ Rectangle {
 
         // There are sufficient unlocked funds available
       // if (walletManager.amountFromString(amountInput.text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1") : 0)) {
-       if (walletManager.amountFromString(amountInput.text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1") : 0)) {
+       if (walletManager.amountFromString(amountInput.text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1", 0) : 0)) {
             return qsTr("Amount is more than unlocked balance.") + translationManager.emptyString;
         }
 
@@ -165,7 +165,7 @@ Rectangle {
                         }
 
                         MoneroComponents.TextPlain {
-                            text: (appWindow.currentWallet ? walletManager.displayAmount(appWindow.currentWallet.unlockedBalance("SAL1")) : "?.??") + " SAL1 " + translationManager.emptyString;
+                            text: (appWindow.currentWallet ? walletManager.displayAmount(appWindow.currentWallet.unlockedBalance("SAL1", 0)) : "?.??") + " SAL1 " + translationManager.emptyString;
                             Layout.rightMargin: 20
                             font.family: MoneroComponents.Style.fontMonoRegular.name;
                             font.pixelSize: 16
@@ -228,7 +228,7 @@ Rectangle {
                                             cursorPosition = 1;
                                         }
                                     }
-                                error = (text == "") || (walletManager.amountFromString(text) == 0) || (walletManager.amountFromString(text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1") : 0));
+                                error = (text == "") || (walletManager.amountFromString(text) == 0) || (walletManager.amountFromString(text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1", 0) : 0));
 
                                 // error = (text == "") || (walletManager.amountFromString(text) == 0) || (walletManager.amountFromString(text) > appWindow.getUnlockedBalance());
                                     stakeButton.enabled = !error;

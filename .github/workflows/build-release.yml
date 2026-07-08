@@ -13,13 +13,16 @@ on:
 
 env:
   FREE_DISKSPACE: |
-    sudo rm -rf /usr/local/.ghcup /usr/share/dotnet /usr/share/swift /usr/share/miniconda
+    sudo rm -rf /usr/local/.ghcup 2>/dev/null || true
+    sudo rm -rf /usr/share/dotnet 2>/dev/null || true
+    sudo rm -rf /usr/share/swift 2>/dev/null || true
+    sudo rm -rf /usr/share/miniconda 2>/dev/null || true
 
 jobs:
 
   build-macos-app:
     name: 1. Download Daemon & Build GUI App
-    runs-on: macos-latest
+    runs-on: macos-15
     env:
       QT_TAG: v5.15.17-lts-lgpl
       QT_PREFIX: ${{ github.workspace }}/qt-install
@@ -92,8 +95,8 @@ jobs:
 
       - name: Install GUI build dependencies (Homebrew)
         run: |
-          brew install boost@1.85 openssl@1.1 libsodium pkg-config cmake zeromq \
-                       hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt
+          brew install boost@1.85 openssl@3 libsodium pkg-config cmake zeromq \
+                       hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
 
       - name: Clone qt repo
         run: git clone -b "${{ env.QT_TAG }}" --recursive --depth 1 --shallow-submodules https://github.com/qt/qt5
@@ -123,7 +126,7 @@ jobs:
 
       - name: Set up GUI build environment paths
         run: |
-          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@1.1:/opt/homebrew/opt/boost@1.85:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost@1.85:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
           echo "${{ env.QT_PREFIX }}/bin" >> $GITHUB_PATH
 
       - name: Configure CMake (GUI)
@@ -136,8 +139,16 @@ jobs:
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \
                 -D Boost_INCLUDE_DIR=/opt/homebrew/opt/boost@1.85/include \
                 -D Boost_LIBRARY_DIR=/opt/homebrew/opt/boost@1.85/lib \
-                -D CMAKE_EXE_LINKER_FLAGS="-L/opt/homebrew/opt/openssl@1.1/lib" \
-                -D CMAKE_CXX_FLAGS="-I/opt/homebrew/opt/boost@1.85/include" \
+                -D OPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3 \
+                -D OPENSSL_INCLUDE_DIR=/opt/homebrew/opt/openssl@3/include \
+                -D OPENSSL_SSL_LIBRARY=/opt/homebrew/opt/openssl@3/lib/libssl.dylib \
+                -D OPENSSL_CRYPTO_LIBRARY=/opt/homebrew/opt/openssl@3/lib/libcrypto.dylib \
+                -D HIDAPI_INCLUDE_DIR=/opt/homebrew/opt/hidapi/include \
+                -D HIDAPI_LIBRARY=/opt/homebrew/opt/hidapi/lib/libhidapi.dylib \
+                -D ZMQ_INCLUDE_PATH=/opt/homebrew/opt/zeromq/include \
+                -D ZMQ_LIB=/opt/homebrew/opt/zeromq/lib/libzmq.dylib \
+                -D CMAKE_EXE_LINKER_FLAGS="-L/opt/homebrew/opt/openssl@3/lib" \
+                -D CMAKE_CXX_FLAGS="-I/opt/homebrew/opt/libsodium/include -I/opt/homebrew/opt/libgpg-error/include -I/opt/homebrew/opt/zeromq/include -I/opt/homebrew/opt/boost@1.85/include" \
                 ../..
         env:
            CMAKE_PREFIX_PATH: ${{ env.CMAKE_PREFIX_PATH }}
@@ -162,7 +173,7 @@ jobs:
 
   bundle-macos-release:
     name: 2. Create Final macOS DMG
-    runs-on: macos-latest
+    runs-on: macos-15
     needs: build-macos-app
 
     steps:

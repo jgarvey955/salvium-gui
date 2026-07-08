@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ARG THREADS=1
 ARG QT_VERSION=v5.15.18-lts-lgpl
@@ -13,7 +13,8 @@ ENV SOURCE_DATE_EPOCH=1397818193
 RUN apt update && \
     apt install -y automake build-essential cmake autopoint bison gettext git gperf libgl1-mesa-dev libglib2.0-dev \
     libpng-dev libpthread-stubs0-dev libsodium-dev libtool-bin libudev-dev libusb-1.0-0-dev mesa-common-dev \
-    pkg-config python wget xutils-dev libxext-dev libx11-xcb-dev libssl-dev
+    pkg-config python2 perl wget xutils-dev libxext-dev libx11-xcb-dev && \
+    ln -sf /usr/bin/python2 /usr/local/bin/python
 
 RUN git clone -b xorgproto-2020.1 --depth 1 https://gitlab.freedesktop.org/xorg/proto/xorgproto && \
     cd xorgproto && \
@@ -29,6 +30,7 @@ RUN git clone -b 1.12 --depth 1 https://gitlab.freedesktop.org/xorg/proto/xcbpro
     ./autogen.sh && \
     make -j$THREADS && \
     make -j$THREADS install && \
+    sed -i 's|${PYTHON_PREFIX}|/usr/local|g;s|${PYTHON_EXEC_PREFIX}|/usr/local|g' /usr/local/lib/pkgconfig/xcb-proto.pc && \
     rm -rf $(pwd)
 
 RUN git clone -b libXau-1.0.9 --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxau && \
@@ -158,31 +160,47 @@ RUN git clone -b release-64-2 --depth 1 https://github.com/unicode-org/icu && \
     make -j$THREADS install && \
     rm -rf $(pwd)
 
-RUN wget https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \
-    echo "4b2136f98bdd1f5857f1c3dea9ac2018effe65286cf251534b6ae20cc45e1847 boost_1_80_0.tar.gz" | sha256sum -c && \
-    tar -xzf boost_1_80_0.tar.gz && \
-    rm boost_1_80_0.tar.gz && \
-    cd boost_1_80_0 && \
-    ./bootstrap.sh && \
-    ./b2 --with-atomic --with-system --with-filesystem --with-thread --with-date_time --with-chrono --with-regex --with-serialization --with-program_options --with-locale variant=release link=static runtime-link=static cflags="${CFLAGS}" cxxflags="${CXXFLAGS}" install -a --prefix=/usr && \
+ARG BOOST_VERSION=1_91_0
+ARG BOOST_VERSION_DOT=1.91.0
+ARG BOOST_HASH=de5e6b0e4913395c6bdfa90537febd9028ea4c0735d2cdb0cd9b45d5f51264f5
+COPY salvium/contrib/depends/patches/boost/gcc15-wchar-from-mb-init.patch /tmp/boost-gcc15-wchar-from-mb-init.patch
+RUN wget https://archives.boost.io/release/${BOOST_VERSION_DOT}/source/boost_${BOOST_VERSION}.tar.bz2 && \
+    echo "${BOOST_HASH}  boost_${BOOST_VERSION}.tar.bz2" | sha256sum -c && \
+    tar -xf boost_${BOOST_VERSION}.tar.bz2 && \
+    rm boost_${BOOST_VERSION}.tar.bz2 && \
+    cd boost_${BOOST_VERSION} && \
+    patch -p1 < /tmp/boost-gcc15-wchar-from-mb-init.patch && \
+    ./bootstrap.sh --without-icu --with-libraries=atomic,chrono,filesystem,thread,date_time,regex,serialization,program_options,locale && \
+    ./b2 --with-atomic --with-chrono --with-filesystem --with-thread --with-date_time --with-regex --with-serialization --with-program_options --with-locale variant=release link=static runtime-link=shared cflags="${CFLAGS}" cxxflags="${CXXFLAGS}" install -a --prefix=/usr && \
     rm -rf $(pwd)
 
-RUN wget https://www.openssl.org/source/openssl-1.1.1u.tar.gz && \
-    echo "e2f8d84b523eecd06c7be7626830370300fbcc15386bf5142d72758f6963ebc6 openssl-1.1.1u.tar.gz" | sha256sum -c && \
-    tar -xzf openssl-1.1.1u.tar.gz && \
-    rm openssl-1.1.1u.tar.gz && \
-    cd openssl-1.1.1u && \
-    ./config no-shared no-zlib-dynamic --prefix=/usr --openssldir=/usr && \
-    make -j$THREADS && \
-    make -j$THREADS install && \
+ARG OPENSSL_VERSION=4.0.1
+ARG OPENSSL_HASH=2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09
+RUN wget -q https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz && \
+    echo "${OPENSSL_HASH}  openssl-${OPENSSL_VERSION}.tar.gz" | sha256sum -c && \
+    tar -xzf openssl-${OPENSSL_VERSION}.tar.gz && \
+    rm openssl-${OPENSSL_VERSION}.tar.gz && \
+    cd openssl-${OPENSSL_VERSION} && \
+    ./Configure --prefix=/usr --openssldir=/usr/etc/openssl --libdir=lib \
+    no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost no-md2 no-rc5 no-rdrand no-rfc3779 \
+    no-sctp no-shared no-ssl-trace no-tests no-unit-test no-weak-ssl-ciphers no-zlib no-zlib-dynamic \
+    -fPIC -Wa,--noexecstack linux-x86_64 && \
+    make -j$THREADS build_libs && \
+    make -j$THREADS install_sw && \
     rm -rf $(pwd)
 
-RUN wget https://www.nlnetlabs.nl/downloads/unbound/unbound-1.16.2.tar.gz && \
-    echo "2e32f283820c24c51ca1dd8afecfdb747c7385a137abe865c99db4b257403581 unbound-1.16.2.tar.gz" | sha256sum -c && \
-    tar -xzf unbound-1.16.2.tar.gz && \
-    rm unbound-1.16.2.tar.gz && \
-    cd unbound-1.16.2 && \
-    ./configure --disable-shared --enable-static --without-pyunbound --with-libexpat=/usr --with-ssl=/usr --with-libevent=no --without-pythonmodule --disable-flto --with-pthreads --with-libunbound-only --with-pic && \
+ARG UNBOUND_VERSION=1.25.1
+ARG UNBOUND_HASH=0fe8b6277b0959cfd17562debac0aa5f71e0b02dc4ffa9c60271c583edab586f
+COPY salvium/contrib/depends/patches/unbound/no-expat.patch /tmp/unbound-no-expat.patch
+COPY salvium/contrib/depends/patches/unbound/gcc15-const-correctness.patch /tmp/unbound-gcc15-const-correctness.patch
+RUN wget https://www.nlnetlabs.nl/downloads/unbound/unbound-${UNBOUND_VERSION}.tar.gz && \
+    echo "${UNBOUND_HASH}  unbound-${UNBOUND_VERSION}.tar.gz" | sha256sum -c && \
+    tar -xzf unbound-${UNBOUND_VERSION}.tar.gz && \
+    rm unbound-${UNBOUND_VERSION}.tar.gz && \
+    cd unbound-${UNBOUND_VERSION} && \
+    patch -p1 < /tmp/unbound-no-expat.patch && \
+    patch -p1 < /tmp/unbound-gcc15-const-correctness.patch && \
+    ./configure --disable-shared --enable-static --without-pyunbound --with-libexpat=no --with-ssl=/usr --with-libevent=no --without-pythonmodule --disable-flto --with-pthreads --with-libunbound-only --disable-gost --with-pic && \
     make -j$THREADS && \
     make -j$THREADS install && \
     rm -rf $(pwd)
@@ -283,7 +301,7 @@ RUN git clone -b v21.5 --depth 1 https://github.com/protocolbuffers/protobuf && 
 RUN git clone -b v3.24.0 --depth 1 https://github.com/Kitware/CMake && \
     cd CMake && \
     git reset --hard 4be24f031a4829db75b85062cc67125035d8831e && \
-    ./bootstrap && \
+    ./bootstrap -- -DCMAKE_USE_OPENSSL=OFF && \
     make -j$THREADS && \
     make -j$THREADS install && \
     rm -rf $(pwd)

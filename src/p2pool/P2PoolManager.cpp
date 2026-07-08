@@ -41,43 +41,109 @@
 #include <QApplication>
 #include <QProcess>
 #include <QMap>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRegularExpression>
+#include <QTextStream>
 
 #if defined(Q_OS_MACOS) && defined(__aarch64__) && !defined(Q_OS_MACOS_AARCH64)
 #define Q_OS_MACOS_AARCH64
 #endif
 
-void P2PoolManager::download() {
-    m_scheduler.run([this] {
-        QUrl url;
-        QString fileName;
-        #ifdef Q_OS_WIN
-            url = "https://github.com/mxhess/p2pool-salvium/releases/download/v4.15/p2pool-salvium-v4.15-windows-x64.zip";
-            fileName = m_p2poolPath + "/p2pool-salvium-v4.15-windows-x64.zip";
-            // Optional integrity check (disabled):
-            // validHash = "db0b73fa052ec715335073782728895cb96ba9307deb8f7bd0da00578ec8c040";
-        #elif defined(Q_OS_LINUX)
-            url = "https://github.com/mxhess/p2pool-salvium/releases/download/v4.15/p2pool-salvium-v4.15-linux-x64.tar.gz";
-            fileName = m_p2poolPath + "/p2pool-salvium-v4.15-linux-x64.tar.gz";
-            // Optional integrity check (disabled):
-            // validHash = "fc606f1cdda056b8a5edc7b0b7427aac5615a4a660ccd008d0392d9a2967b35c";
-        #elif defined(Q_OS_MACOS_AARCH64)
-            url = "https://github.com/mxhess/p2pool-salvium/releases/download/v4.15/p2pool-salvium-v4.15-macos-aarch64.tar.gz";
-            fileName = m_p2poolPath + "/p2pool-salvium-v4.15-macos-aarch64.tar.gz";
-            // Optional integrity check (disabled):
-            // validHash = "312d3f192bb533d561c6fce2af0d9ef38296592b0ac4a9f6d52541d29e1c0913";
-        #elif defined(Q_OS_MACOS)
-            url = "https://github.com/mxhess/p2pool-salvium/releases/download/v4.15/p2pool-salvium-v4.15-macos-x64.tar.gz";
-            fileName = m_p2poolPath + "/p2pool-salvium-v4.15-macos-x64.tar.gz";
-            // Optional integrity check (disabled):
-            // validHash = "f54a80dc1b25cdb38ec86cf9207da07d579bb5ecdd68ed1576dbcea0004a8b30";
-        #endif
-        QFile file(fileName);
-        epee::net_utils::http::http_simple_client http_client;
-        const epee::net_utils::http::http_response_info* response = NULL;
+namespace
+{
+    const QString P2POOL_PROJECT_ID = "80288850";
+    const QString P2POOL_PACKAGE = "p2pool-salvium";
+    const QString P2POOL_DEFAULT_VERSION = "v4.27";
+
+    QString p2poolArchiveSuffix()
+    {
+    #ifdef Q_OS_WIN
+        return "windows-x64.zip";
+    #elif defined(Q_OS_LINUX)
+        return "linux-x64-static.tar.gz";
+    #elif defined(Q_OS_MACOS_AARCH64)
+        return "macos-aarch64.tar.gz";
+    #elif defined(Q_OS_MACOS)
+        return "macos-x64.tar.gz";
+    #else
+        return "";
+    #endif
+    }
+
+    QString p2poolArchiveName(const QString &version)
+    {
+        const QString suffix = p2poolArchiveSuffix();
+        if (suffix.isEmpty()) {
+            return "";
+        }
+        return QString("%1-%2-%3").arg(P2POOL_PACKAGE, version, suffix);
+    }
+
+    QUrl p2poolDownloadUrl(const QString &version)
+    {
+        const QString archiveName = p2poolArchiveName(version);
+        if (archiveName.isEmpty()) {
+            return {};
+        }
+        return QUrl(QString("https://gitlab.com/api/v4/projects/%1/packages/generic/%2/%3/%4")
+                        .arg(P2POOL_PROJECT_ID, P2POOL_PACKAGE, version, archiveName));
+    }
+
+    QUrl p2poolLatestReleaseUrl()
+    {
+        return QUrl(QString("https://gitlab.com/api/v4/projects/%1/releases?per_page=1").arg(P2POOL_PROJECT_ID));
+    }
+
+    std::string requestTarget(const QUrl &url)
+    {
+        QString target = url.path();
+        const QString query = url.query(QUrl::FullyEncoded);
+        if (!query.isEmpty()) {
+            target += "?" + query;
+        }
+        return target.toStdString();
+    }
+
+    bool httpGet(const QUrl &url, epee::net_utils::http::http_simple_client &http_client, const epee::net_utils::http::http_response_info **response)
+    {
         std::string userAgent = randomUserAgent().toStdString();
         std::chrono::milliseconds timeout = std::chrono::seconds(10);
         http_client.set_server(url.host().toStdString(), "443", {});
-        bool success = http_client.invoke_get(url.path().toStdString(), timeout, {}, std::addressof(response), {{"User-Agent", userAgent}});
+        return http_client.invoke_get(requestTarget(url), timeout, {}, response, {{"User-Agent", userAgent}});
+    }
+}
+
+void P2PoolManager::download() {
+    downloadVersion(P2POOL_DEFAULT_VERSION);
+}
+
+void P2PoolManager::update() {
+    QString latestVersion;
+    {
+        QMutexLocker locker(&m_latestVersionMutex);
+        latestVersion = m_latestVersion;
+    }
+
+    const QString version = latestVersion.isEmpty() ? P2POOL_DEFAULT_VERSION : latestVersion;
+    downloadVersion(version);
+}
+
+void P2PoolManager::downloadVersion(const QString &version) {
+    m_scheduler.run([this, version] {
+        QUrl url = p2poolDownloadUrl(version);
+        const QString archiveName = p2poolArchiveName(version);
+        const QString fileName = m_p2poolPath + "/" + archiveName;
+        if (!url.isValid() || archiveName.isEmpty()) {
+            emit p2poolDownloadFailure(BinaryNotAvailable);
+            return;
+        }
+
+        QFile file(fileName);
+        epee::net_utils::http::http_simple_client http_client;
+        const epee::net_utils::http::http_response_info* response = NULL;
+        bool success = httpGet(url, http_client, std::addressof(response));
         if (success && response->m_response_code == 404) {
             emit p2poolDownloadFailure(BinaryNotAvailable);
             return;
@@ -87,10 +153,8 @@ void P2PoolManager::download() {
                 if (i.first == "Location") {
                     url = QString::fromStdString(i.second);
                     http_client.set_server(url.host().toStdString(), "443", {});
-                    std::string query = url.query(QUrl::FullyEncoded).toStdString();
-                    std::string path = url.path().toStdString() + "?" + query;
                     http_client.wipe_response();
-                    success = http_client.invoke_get(path, timeout, {}, std::addressof(response), {{"User-Agent", userAgent}});
+                    success = httpGet(url, http_client, std::addressof(response));
                 }
             }
         }
@@ -130,7 +194,22 @@ void P2PoolManager::download() {
                 return;
             }
 
+            #ifdef Q_OS_WIN
+            if (!QFileInfo(m_p2pool).isFile()) {
+                const QString extractedP2Pool = m_p2poolPath + "/Release/p2pool-salvium.exe";
+                if (QFileInfo(extractedP2Pool).isFile()) {
+                    QFile::remove(m_p2pool);
+                    QFile::rename(extractedP2Pool, m_p2pool);
+                }
+            }
+            #endif
+
             if (isInstalled()) {
+                QFile versionFile(m_p2poolPath + "/p2pool-salvium.version");
+                if (versionFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+                    QTextStream out(&versionFile);
+                    out << version << "\n";
+                }
                 emit p2poolDownloadSuccess();
             }
             else {
@@ -141,12 +220,77 @@ void P2PoolManager::download() {
     return;
 }
 
-bool P2PoolManager::isInstalled() {
+void P2PoolManager::checkForUpdates() {
+    m_scheduler.run([this] {
+        epee::net_utils::http::http_simple_client http_client;
+        const epee::net_utils::http::http_response_info* response = NULL;
+        bool success = httpGet(p2poolLatestReleaseUrl(), http_client, std::addressof(response));
+        if (!success || !response || response->m_response_code != 200) {
+            emit p2poolUpdateCheckFailure();
+            return;
+        }
+
+        const QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(response->m_body));
+        if (!doc.isArray() || doc.array().isEmpty() || !doc.array().first().isObject()) {
+            emit p2poolUpdateCheckFailure();
+            return;
+        }
+
+        const QString latestVersion = doc.array().first().toObject().value("tag_name").toString();
+        if (latestVersion.isEmpty()) {
+            emit p2poolUpdateCheckFailure();
+            return;
+        }
+
+        {
+            QMutexLocker locker(&m_latestVersionMutex);
+            m_latestVersion = latestVersion;
+        }
+
+        const QString installedVersion = currentVersion();
+        if (installedVersion != latestVersion) {
+            emit p2poolUpdateAvailable(installedVersion, latestVersion);
+        }
+        else {
+            emit p2poolUpdateNotAvailable(installedVersion);
+        }
+    });
+}
+
+bool P2PoolManager::isInstalled() const {
     if (!QFileInfo(m_p2pool).isFile())
     {
         return false;
     }
     return true;
+}
+
+QString P2PoolManager::currentVersion() const {
+    QFile versionFile(m_p2poolPath + "/p2pool-salvium.version");
+    if (versionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        const QString version = QString::fromUtf8(versionFile.readAll()).trimmed();
+        if (!version.isEmpty()) {
+            return version;
+        }
+    }
+
+    if (!isInstalled()) {
+        return "not installed";
+    }
+
+    QProcess versionProcess;
+    versionProcess.start(m_p2pool, {"--version"});
+    if (versionProcess.waitForFinished(3000)) {
+        const QString output = QString::fromUtf8(versionProcess.readAllStandardOutput())
+            + QString::fromUtf8(versionProcess.readAllStandardError());
+        const QRegularExpression versionRegex("(v\\d+\\.\\d+)");
+        const QRegularExpressionMatch match = versionRegex.match(output);
+        if (match.hasMatch()) {
+            return match.captured(1);
+        }
+    }
+
+    return "unknown";
 }
 
 void P2PoolManager::getStatus() {
@@ -219,15 +363,27 @@ bool P2PoolManager::start(const QString &flags, const QString &address, const QS
 
     QMutexLocker locker(&m_p2poolMutex);
 
-    m_p2poold.reset(new QProcess());
+    if (m_p2poold && m_p2poold->state() != QProcess::NotRunning) {
+        return true;
+    }
+
+    m_p2poold.reset(new QProcess(this));
+    connect(m_p2poold.get(), qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            this, [this](int, QProcess::ExitStatus) {
+                started = false;
+                emit p2poolStatus(false, 0);
+            });
 
     // Set program parameters
     m_p2poold->setProgram(m_p2pool);
     m_p2poold->setArguments(arguments);
     m_p2poold->setWorkingDirectory(m_p2poolPath);
+    m_p2poold->setStandardOutputFile(QProcess::nullDevice());
+    m_p2poold->setStandardErrorFile(QProcess::nullDevice());
 
     // Start p2pool
-    started = m_p2poold->startDetached();
+    m_p2poold->start();
+    started = m_p2poold->waitForStarted(5000);
 
     if (!started) {
         qDebug() << "P2Pool start error: " + m_p2poold->errorString();
@@ -241,17 +397,32 @@ bool P2PoolManager::start(const QString &flags, const QString &address, const QS
 void P2PoolManager::exit()
 {
     qDebug("P2PoolManager: exit()");
-    if (started) {
-    #ifdef Q_OS_WIN
-        QProcess::execute("taskkill",  {"/F", "/IM", "p2pool-salvium.exe"});
-    #else
-        QProcess::execute("pkill", {"p2pool-salvium"});
-    #endif
+    {
+        QMutexLocker locker(&m_p2poolMutex);
+        if (m_p2poold && m_p2poold->state() != QProcess::NotRunning) {
+            m_p2poold->terminate();
+            if (!m_p2poold->waitForFinished(5000)) {
+                m_p2poold->kill();
+                m_p2poold->waitForFinished(5000);
+            }
+        }
+
+        if (started) {
+        #ifdef Q_OS_WIN
+            QProcess::execute("taskkill",  {"/F", "/IM", QFileInfo(m_p2pool).fileName()});
+        #else
+            QProcess::execute("pkill", {"-x", QFileInfo(m_p2pool).fileName()});
+        #endif
+        }
+
         started = false;
-        QString dirName = m_p2poolPath + "/stats/";
-        QDir dir(dirName);
-        dir.removeRecursively();
+        m_p2poold.reset();
     }
+
+    QString dirName = m_p2poolPath + "/stats/";
+    QDir dir(dirName);
+    dir.removeRecursively();
+    emit p2poolStatus(false, 0);
 }
 
 P2PoolManager::P2PoolManager(QObject *parent)
