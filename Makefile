@@ -1,6 +1,16 @@
 ANDROID_STANDALONE_TOOLCHAIN_PATH ?= /usr/local/toolchain
 MANUAL_SUBMODULES ?= OFF
 
+host_system := $(shell uname -s)
+windows_host := $(filter MINGW% MSYS% CYGWIN%,$(host_system))
+native_prefix := $(shell cd $$(dirname $$(command -v $(CC)))/.. 2>/dev/null && pwd)
+release_static_generator :=
+release_static_platform_args :=
+release_builddir := $(builddir)
+release_topdir := $(topdir)
+release_generator :=
+release_platform_args :=
+
 dotgit=$(shell ls -d .git/config)
 ifeq ($(dotgit), .git/config)
   ifeq ($(shell git --version > /dev/null 2>&1 ; echo $$?), 0)
@@ -32,6 +42,21 @@ else
   deldirs := $(builddir)/debug $(builddir)/release $(builddir)/fuzz
 endif
 
+release_static_builddir := $(builddir)
+release_static_topdir := $(topdir)
+release_static_environment :=
+ifneq ($(windows_host),)
+  release_builddir := build/$(if $(MSYSTEM),$(MSYSTEM),windows)-qt5-shared
+  release_topdir := ../../..
+  release_generator := -G "MSYS Makefiles"
+  release_platform_args := -D ARCH="x86-64" -D BUILD_TAG="win-x64"
+  release_static_builddir := build/$(if $(MSYSTEM),$(MSYSTEM),windows)-qt5-static
+  release_static_topdir := ../../..
+  release_static_environment := CMAKE_PREFIX_PATH="$(native_prefix)/qt5-static" PKG_CONFIG_PATH="$(native_prefix)/qt5-static/lib/pkgconfig"
+  release_static_generator := -G "MSYS Makefiles"
+  release_static_platform_args := -D ARCH="x86-64" -D BUILD_TAG="win-x64"
+endif
+
 default:
 	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(BOOST_SYSTEM_CMAKE_FLAGS) .. && $(MAKE)
 debug:
@@ -51,7 +76,7 @@ scanner:
 	mkdir -p build && cd build && cmake -D DEV_MODE=$(or ${DEV_MODE},ON) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D WITH_SCANNER=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release .. && $(MAKE)
 
 release:
-	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
+	mkdir -p $(release_builddir)/release && cd $(release_builddir)/release && cmake $(release_generator) -D STATIC=OFF -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D CMAKE_BUILD_TYPE=Release $(release_platform_args) $(release_topdir) && $(MAKE)
 
 release-linux-armv8:
 	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -D ARCH="armv8-a" -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D BUILD_TAG="linux-armv8" $(topdir) && $(MAKE)
@@ -60,7 +85,7 @@ release-linux-ppc64le:
 	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D ARCH="ppc64le" -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
 
 release-static:
-	mkdir -p $(builddir)/release && cd $(builddir)/release && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)
+	mkdir -p $(release_static_builddir)/release && cd $(release_static_builddir)/release && $(release_static_environment) cmake $(release_static_generator) -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(release_static_platform_args) $(release_static_topdir) && $(MAKE)
 
 release-static-mac-x86_64:
 	mkdir -p $(builddir)/release &&	cd $(builddir)/release && cmake -D STATIC=ON -D DEV_MODE=$(or ${DEV_MODE},OFF) -DMANUAL_SUBMODULES=${MANUAL_SUBMODULES} -D ARCH="x86-64" -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release $(topdir) && $(MAKE)

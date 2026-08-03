@@ -160,6 +160,37 @@ endif()
 
 add_custom_command(TARGET salvium-wallet-gui POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daemon> $<TARGET_FILE_DIR:salvium-wallet-gui>)
 
+if(MINGW AND STATIC AND NOT DEPENDS)
+    # MSYS2's static Boost.Locale is built against ICU's DLL ABI.  Deploy
+    # that unavoidable runtime chain beside the otherwise-static executable.
+    get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    file(GLOB ICU_RUNTIME_DLLS
+        "${MINGW_BIN_DIR}/libicudt*.dll"
+        "${MINGW_BIN_DIR}/libicuin*.dll"
+        "${MINGW_BIN_DIR}/libicuuc*.dll"
+    )
+    set(MINGW_RUNTIME_DLLS
+        "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+        "${MINGW_BIN_DIR}/libstdc++-6.dll"
+        "${MINGW_BIN_DIR}/libwinpthread-1.dll"
+    )
+    if(NOT ICU_RUNTIME_DLLS)
+        message(FATAL_ERROR "Static MinGW build requires ICU runtime DLLs in ${MINGW_BIN_DIR}")
+    endif()
+    foreach(RUNTIME_DLL IN LISTS MINGW_RUNTIME_DLLS)
+        if(NOT EXISTS "${RUNTIME_DLL}")
+            message(FATAL_ERROR "Static MinGW build requires ${RUNTIME_DLL}")
+        endif()
+    endforeach()
+    set(WINDOWS_RUNTIME_DLLS ${ICU_RUNTIME_DLLS} ${MINGW_RUNTIME_DLLS})
+    add_custom_command(TARGET salvium-wallet-gui POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${WINDOWS_RUNTIME_DLLS}
+            $<TARGET_FILE_DIR:salvium-wallet-gui>
+        COMMENT "Deploying ICU and MinGW runtime DLLs"
+    )
+endif()
+
 include(Deploy)
 
 install(TARGETS salvium-wallet-gui

@@ -204,6 +204,12 @@ if(QT5_PKG_CONFIG_FOUND)
   endif()
 
   set(QT5_LIBRARIES ${${QT5_PKG_CONFIG}_LIBRARIES} ${${QT5_PKG_CONFIG}_LDFLAGS_OTHER})
+  if(STATIC AND MINGW)
+    # MSYS2's static Qt 5 pkg-config files currently emit -l:libz and
+    # -l:libzstd, which name nonexistent files instead of libz.a/libzstd.a.
+    list(TRANSFORM QT5_LIBRARIES REPLACE "^:libz$" "z")
+    list(TRANSFORM QT5_LIBRARIES REPLACE "^:libzstd$" "zstd")
+  endif()
   include_directories(${${QT5_PKG_CONFIG}_INCLUDE_DIRS})
   link_directories(${${QT5_PKG_CONFIG}_LIBRARY_DIRS})
 endif()
@@ -218,25 +224,30 @@ list(APPEND QT5_LIBRARIES
 if(STATIC)
 
   set(QT5_PKG_CONFIG_Qt5Qml_PREFIX $ENV{QT5_PKG_CONFIG_Qt5Qml_PREFIX})
-    
-  set(QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/Qt/labs/folderlistmodel)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/Qt/labs/settings)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/Qt/labs/platform)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtGraphicalEffects)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtGraphicalEffects/private)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtMultimedia)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQml)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQml/Models.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Controls)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Controls.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Dialogs)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Dialogs/Private)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Layouts)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/PrivateWidgets)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Templates.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/Window.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml/QtQuick/XmlListModel)
+  set(QT5_QML_ROOT ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml)
+  if(EXISTS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/share/qt5/qml)
+    set(QT5_QML_ROOT ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/share/qt5/qml)
+  endif()
+
+  set(QT5_EXTRA_PATHS ${QT5_QML_ROOT}/Qt/labs/folderlistmodel)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/Qt/labs/settings)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/Qt/labs/platform)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtGraphicalEffects)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtGraphicalEffects/private)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtMultimedia)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml/Models.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml/WorkerScript.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Controls)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Controls.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Dialogs)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Dialogs/Private)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Layouts)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/PrivateWidgets)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Templates.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Window.2)
+  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/XmlListModel)
 
   message(STATUS "Using QT5_EXTRA_PATHS: '${QT5_EXTRA_PATHS}'")
     
@@ -266,6 +277,8 @@ if(STATIC)
     qtgraphicaleffectsplugin
     qtgraphicaleffectsprivate
     qtquick2plugin
+    Qt5QmlWorkerScript
+    workerscriptplugin
     qtquickcontrolsplugin
     widgetsplugin
     windowplugin
@@ -291,6 +304,22 @@ if(STATIC)
     ${QT5_EXTRA_LIBRARIES}
     ${QT5_LIBRARIES}
   )
+
+  if(MINGW)
+    # The MSYS2 static Qt build enables the virtual-keyboard platform plugin,
+    # whose three QML plugins are not propagated by its CMake target.
+    foreach(LIBRARY
+        qtquickvirtualkeyboardplugin
+        qtquickvirtualkeyboardsettingsplugin
+        qtquickvirtualkeyboardstylesplugin)
+      find_library(${LIBRARY}_LIBRARY ${LIBRARY}
+        PATHS ${QT5_QML_ROOT}/QtQuick/VirtualKeyboard
+              ${QT5_QML_ROOT}/QtQuick/VirtualKeyboard/Settings
+              ${QT5_QML_ROOT}/QtQuick/VirtualKeyboard/Styles
+        REQUIRED)
+      list(APPEND QT5_LIBRARIES ${${LIBRARY}_LIBRARY})
+    endforeach()
+  endif()
 
   set(QT5_INTEGRATION_LIBRARIES_LIST
     Qt5EventDispatcherSupport
