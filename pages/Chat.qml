@@ -1190,7 +1190,7 @@ Rectangle {
 
             Text {
                 Layout.fillWidth: true
-                text: qsTr("Remove this contact? Existing message history remains until you delete those messages.") + translationManager.emptyString
+                text: qsTr("Remove this contact and delete its local message history from this wallet? This cannot be undone.") + translationManager.emptyString
                 color: MoneroComponents.Style.defaultFontColor
                 font.family: MoneroComponents.Style.fontRegular.name
                 font.pixelSize: 16
@@ -1210,7 +1210,7 @@ Rectangle {
                         else {
                             selectedContactId = ""
                             refreshAll(false)
-                            showNotice(qsTr("Contact removed."), false)
+                            showNotice(qsTr("Contact and local message history deleted."), false)
                         }
                     }
                 }
