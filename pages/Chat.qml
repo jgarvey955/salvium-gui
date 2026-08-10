@@ -1111,10 +1111,79 @@ Rectangle {
                 }
 
                 MoneroComponents.StandardButton {
+                    primary: false
+                    text: qsTr("Generate new key") + translationManager.emptyString
+                    onClicked: {
+                        ownAddressPopup.close()
+                        confirmRotateIdentityPopup.open()
+                    }
+                }
+
+                MoneroComponents.StandardButton {
                     text: qsTr("Copy contact code") + translationManager.emptyString
                     onClicked: {
                         clipboard.setText(addressOutput.text)
                         showNotice(qsTr("Salchat contact code copied."), false)
+                    }
+                }
+            }
+        }
+    }
+
+    Popup {
+        id: confirmRotateIdentityPopup
+        parent: root
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        width: Math.min(520, root.width - 40)
+        height: 280
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        padding: 20
+        background: Rectangle {
+            radius: 7
+            color: MoneroComponents.Style.middlePanelBackgroundColor
+            border.color: MoneroComponents.Style.inputBorderColorInActive
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 14
+
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Generate a new Salchat encryption key? Your contact code will change, so every contact must receive the new code. Back up this wallet file after rotation: the generated key is not restored by the seed alone. Up to 16 still-valid prior keys are retained for already-waiting messages; more rapid rotations can evict the oldest key.") + translationManager.emptyString
+                color: MoneroComponents.Style.defaultFontColor
+                font.family: MoneroComponents.Style.fontRegular.name
+                font.pixelSize: 16
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+
+                MoneroComponents.StandardButton {
+                    primary: false
+                    text: qsTr("Cancel") + translationManager.emptyString
+                    onClicked: confirmRotateIdentityPopup.close()
+                }
+
+                MoneroComponents.StandardButton {
+                    text: qsTr("Generate key") + translationManager.emptyString
+                    onClicked: {
+                        var result = currentWallet.salchatRotateIdentity()
+                        if (!result.success) {
+                            confirmRotateIdentityPopup.close()
+                            displayError(result, qsTr("Could not generate a new Salchat encryption key."))
+                            return
+                        }
+                        addressOutput.text = result.salviumAddress + ":" + result.encryptionPublicKey
+                        confirmRotateIdentityPopup.close()
+                        ownAddressPopup.open()
+                        showNotice(qsTr("New Salchat key generated. Back up the wallet and share the new contact code."), false)
                     }
                 }
             }

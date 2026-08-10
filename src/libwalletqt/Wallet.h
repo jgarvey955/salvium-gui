@@ -362,6 +362,7 @@ public:
 
     //! Salchat encrypted wallet messaging
     Q_INVOKABLE QVariantMap salchatGetIdentity() const;
+    Q_INVOKABLE QVariantMap salchatRotateIdentity();
     Q_INVOKABLE QVariantMap salchatGetAddress() const;
     Q_INVOKABLE QVariantMap salchatAddContact(const QString &label, const QString &addressOrContactId);
     Q_INVOKABLE QVariantMap salchatAcceptContact(const QString &label, const QString &messageId);

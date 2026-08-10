@@ -1065,6 +1065,16 @@ QVariantMap Wallet::salchatGetIdentity() const
     return result;
 }
 
+QVariantMap Wallet::salchatRotateIdentity()
+{
+    Monero::SalchatIdentity identity;
+    const bool success = m_walletImpl->salchatRotateIdentity(identity);
+    QVariantMap result = salchatIdentityMap(identity);
+    result.insert("success", success);
+    result.insert("error", success ? QString() : errorString());
+    return result;
+}
+
 QVariantMap Wallet::salchatGetAddress() const
 {
     std::string address;
