@@ -33,8 +33,10 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QFileDialog>
+#include <QMutexLocker>
 #include <QScreen>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QWindow>
 #include <QDir>
@@ -200,23 +202,38 @@ QString OSHelper::openSaveFileDialog(const QString &title, const QString &folder
 
 QString OSHelper::temporaryFilename() const
 {
-    QString tempFileName;
+    auto directory = QSharedPointer<QTemporaryDir>::create();
+    if (!directory->isValid())
     {
-        QTemporaryFile f;
-        f.open();
-        tempFileName = f.fileName();
+        qWarning() << "Could not create a private temporary wallet directory";
+        return {};
     }
+
+    const QString tempFileName = QDir(directory->path()).filePath("wallet");
+    QMutexLocker locker(&m_temporaryWalletMutex);
+    m_temporaryWalletDirectories.insert(tempFileName, directory);
     return tempFileName;
 }
 
 bool OSHelper::removeTemporaryWallet(const QString &fileName) const
 {
-    // Temporary files should be deleted automatically by default, in case they wouldn't, we delete them manually as well
-    bool cache_deleted = QFile::remove(fileName);
-    bool address_deleted = QFile::remove(fileName + ".address.txt");
-    bool keys_deleted = QFile::remove(fileName +".keys");
+    QSharedPointer<QTemporaryDir> directory;
+    {
+        QMutexLocker locker(&m_temporaryWalletMutex);
+        const auto it = m_temporaryWalletDirectories.find(fileName);
+        if (it == m_temporaryWalletDirectories.end())
+        {
+            qWarning() << "Refusing to remove an unowned temporary wallet path";
+            return false;
+        }
+        directory = it.value();
+        m_temporaryWalletDirectories.erase(it);
+    }
 
-    return cache_deleted && address_deleted && keys_deleted;
+    // The directory is created by QTemporaryDir with owner-only permissions.
+    // Removing the owned directory avoids any path reuse between wallet-key
+    // writes and cleanup.
+    return directory->remove();
 }
 
 // https://stackoverflow.com/a/3006934
@@ -336,6 +353,33 @@ quint8 OSHelper::getNetworkTypeFromFile(const QString &keysPath) const
 
 void OSHelper::openSeedTemplate() const
 {
-    QFile::copy(":/wizard/template.pdf", QDir::tempPath() + "/seed_template.pdf");
-    openFile(QDir::tempPath() + "/seed_template.pdf");
+    QFile source(":/wizard/template.pdf");
+    if (!source.open(QIODevice::ReadOnly))
+    {
+        qWarning() << "Could not open the seed template resource";
+        return;
+    }
+
+    QTemporaryFile output(QDir::tempPath() + "/salvium-seed-template-XXXXXX.pdf");
+    output.setAutoRemove(false);
+    if (!output.open())
+    {
+        qWarning() << "Could not create a private seed template file";
+        return;
+    }
+    output.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    const QByteArray contents = source.readAll();
+    if (output.write(contents) != contents.size() || !output.flush())
+    {
+        const QString failedPath = output.fileName();
+        output.close();
+        QFile::remove(failedPath);
+        qWarning() << "Could not write the seed template";
+        return;
+    }
+
+    const QString templatePath = output.fileName();
+    output.close();
+    if (!openFile(templatePath))
+        QFile::remove(templatePath);
 }

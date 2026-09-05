@@ -32,6 +32,7 @@
 #include <QAbstractListModel>
 
 class AddressBook;
+class Wallet;
 
 class AddressBookModel : public QAbstractListModel
 {
@@ -47,10 +48,11 @@ public:
     };
     Q_ENUM(AddressBookRowRole)
 
-    AddressBookModel(QObject *parent, AddressBook * addressBook);
+    AddressBookModel(Wallet *parent, AddressBook * addressBook);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    Q_INVOKABLE QString displayAddress(int row) const;
     Q_INVOKABLE bool deleteRow(int row);
     virtual QHash<int, QByteArray> roleNames() const  override;
 
@@ -60,6 +62,7 @@ public slots:
 
 private:
     AddressBook * m_addressBook;
+    Wallet * m_wallet;
 };
 
 #endif // ADDRESSBOOKMODEL_H

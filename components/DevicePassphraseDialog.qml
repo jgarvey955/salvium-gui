@@ -88,11 +88,16 @@ Item {
         passphraseDialogMode: true
 
         onAcceptedPassphrase: {
-            if (onAcceptedCallback)
-                onAcceptedCallback(passphraseDialog.password);
+            try {
+                if (onAcceptedCallback)
+                    onAcceptedCallback(passphraseDialog.password);
+            } finally {
+                passphraseDialog.clearInputs();
+            }
         }
 
         onRejectedPassphrase: {
+            passphraseDialog.clearInputs();
             if (onRejectedCallback)
                 onRejectedCallback();
         }

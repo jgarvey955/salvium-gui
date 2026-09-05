@@ -71,7 +71,6 @@ bool DaemonManager::start(const QString &flags, NetworkType::Type nettype, const
 
     // Custom startup flags for daemon
     foreach (const QString &str, flags.split(" ")) {
-          qDebug() << QString(" [%1] ").arg(str);
           if (!str.isEmpty())
             arguments << str;
     }
@@ -107,7 +106,6 @@ bool DaemonManager::start(const QString &flags, NetworkType::Type nettype, const
     }
 
     qDebug() << "starting salviumd " + m_monerod;
-    qDebug() << "With command line arguments " << arguments;
 
     QMutexLocker locker(&m_daemonMutex);
 
@@ -177,7 +175,8 @@ bool DaemonManager::startWatcher(NetworkType::Type nettype, const QString &dataD
 
 bool DaemonManager::stopWatcher(NetworkType::Type nettype, const QString &dataDir) const
 {
-    // Check if daemon is running every 2 seconds. Kill if still running after 10 seconds
+    // A detached daemon has no owned QProcess handle. Report a timeout instead
+    // of terminating unrelated nodes that happen to use the same executable.
     int counter = 0;
     while(true && !m_app_exit) {
         QThread::sleep(2);
@@ -185,12 +184,8 @@ bool DaemonManager::stopWatcher(NetworkType::Type nettype, const QString &dataDi
         if(running(nettype, dataDir)) {
             qDebug() << "Daemon still running.  " << counter;
             if(counter >= 5) {
-                qDebug() << "Killing it! ";
-#ifdef Q_OS_WIN
-                QProcess::execute("taskkill",  {"/F", "/IM", "salviumd.exe"});
-#else
-                QProcess::execute("pkill", {"salviumd"});
-#endif
+                qWarning() << "Timed out waiting for the selected daemon to stop";
+                return false;
             }
 
         } else
@@ -271,9 +266,6 @@ bool DaemonManager::sendCommand(const QStringList &cmd, NetworkType::Type nettyp
     if (!dataDir.isEmpty()) {
         external_cmd << "--data-dir" << dataDir;
     }
-
-    qDebug() << "sending external cmd: " << external_cmd;
-
 
     p.start(m_monerod, external_cmd);
 

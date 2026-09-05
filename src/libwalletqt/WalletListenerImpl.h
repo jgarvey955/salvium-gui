@@ -58,7 +58,8 @@ public:
 
     virtual void onPassphraseEntered(const QString &passphrase, bool enter_on_device, bool entry_abort) override;
 
-    virtual Monero::optional<std::string> onDevicePassphraseRequest(bool & on_device) override;
+    void onDevicePassphraseRequestSecure(bool& on_device,
+        const Monero::WalletListener::DevicePassphraseCallback& receive) override;
 
 private:
     Wallet * m_wallet;

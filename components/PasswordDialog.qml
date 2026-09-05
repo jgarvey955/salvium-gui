@@ -107,6 +107,11 @@ FocusScope {
         open(root.walletName, errorText);
     }
 
+    function clearInputs() {
+        passwordInput1.reset();
+        passwordInput2.reset();
+    }
+
     function close() {
         leftPanel.enabled = true
         middlePanel.enabled = true
@@ -121,6 +126,10 @@ FocusScope {
         appWindow.hideBalanceForced = false;
         appWindow.updateBalance();
         closeCallback();
+        if (passphraseDialogMode) {
+            // Acceptance reads the fields synchronously just after close().
+            Qt.callLater(function() { if (!root.visible) root.clearInputs(); });
+        }
     }
 
     function onOk() {

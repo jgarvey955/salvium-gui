@@ -80,6 +80,30 @@ else()
     set_target_properties(salvium-wallet-gui PROPERTIES COMPILE_DEFINITIONS "ANDROID")
 endif()
 
+# A desktop GUI release is also a complete Salvium binary set. Keep these as
+# explicit dependencies so building only the GUI target still refreshes every
+# embedded-core executable whose inputs changed and recreates any one that is
+# missing from the shared ${CMAKE_BINARY_DIR}/bin output directory.
+if(NOT ANDROID)
+    add_dependencies(salvium-wallet-gui
+        wallet_rpc_server
+        simplewallet
+        gen_multisig
+        gen_ssl_cert
+        daemon
+        blockchain_import
+        blockchain_export
+        blockchain_blackball
+        blockchain_usage
+        blockchain_ancestry
+        blockchain_depth
+        blockchain_scanner
+        blockchain_verification
+        blockchain_stats
+        blockchain_prune_known_spent_data
+        blockchain_prune)
+endif()
+
 set_target_properties(salvium-wallet-gui PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     MACOSX_BUNDLE TRUE
@@ -94,8 +118,10 @@ message(STATUS "OpenGL: libraries at ${OPENGL_LIBRARIES}")
 target_include_directories(salvium-wallet-gui PUBLIC ${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 
 target_include_directories(salvium-wallet-gui PUBLIC
-	${CMAKE_SOURCE_DIR}/salvium/include
+    ${CMAKE_SOURCE_DIR}/salvium/include
     ${CMAKE_SOURCE_DIR}/salvium/src
+    ${CMAKE_SOURCE_DIR}/salvium/src/crypto
+    ${CMAKE_SOURCE_DIR}/salvium/external/mx25519/include
     ${CMAKE_SOURCE_DIR}/salvium/external/easylogging++
     ${CMAKE_SOURCE_DIR}/salvium/contrib/epee/include
     ${CMAKE_SOURCE_DIR}/salvium/external/qrcodegen
@@ -157,8 +183,6 @@ if(WITH_SCANNER)
         )
     endif()
 endif()
-
-add_custom_command(TARGET salvium-wallet-gui POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daemon> $<TARGET_FILE_DIR:salvium-wallet-gui>)
 
 if(MINGW AND STATIC AND NOT DEPENDS)
     # MSYS2's static Boost.Locale is built against ICU's DLL ABI.  Deploy

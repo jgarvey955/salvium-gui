@@ -31,6 +31,7 @@
 
 #include <QtGlobal>
 #include <wallet/api/wallet2_api.h>
+#include <wipeable_string.h>
 #include <QMutex>
 #include <QPointer>
 #include <QWaitCondition>
@@ -58,16 +59,19 @@ class PassphraseHelper {
 public:
     PassphraseHelper(PassprasePrompter * prompter=nullptr): m_prompter(prompter) {};
     PassphraseHelper(const PassphraseHelper & h): PassphraseHelper(h.m_prompter) {};
-    Monero::optional<std::string> onDevicePassphraseRequest(bool & on_device);
+    void onDevicePassphraseRequest(bool& on_device,
+        const Monero::WalletListener::DevicePassphraseCallback& receive);
     void onPassphraseEntered(const QString &passphrase, bool enter_on_device, bool entry_abort);
 
 private:
     PassprasePrompter * m_prompter;
     QWaitCondition m_cond_pass;
     QMutex m_mutex_pass;
-    QString m_passphrase;
-    bool m_passphrase_abort;
-    bool m_passphrase_on_device;
+    epee::wipeable_string m_passphrase;
+    bool m_passphrase_abort = false;
+    bool m_passphrase_on_device = true;
+    bool m_waiting = false;
+    bool m_ready = false;
 
 };
 

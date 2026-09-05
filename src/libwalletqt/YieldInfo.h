@@ -33,6 +33,7 @@
 #include <QList>
 #include <QString>
 #include <QVariant>
+#include <memory>
 
 #include <wallet/api/wallet2_api.h>
 
@@ -46,13 +47,27 @@ class YieldInfo : public QObject
     Q_PROPERTY(quint64 supply READ supply)
     Q_PROPERTY(quint64 yield READ yield)
     Q_PROPERTY(quint64 yield_per_stake READ yield_per_stake)
+    Q_PROPERTY(quint64 total_accrued_from_past_completions READ total_accrued_from_past_completions)
+    Q_PROPERTY(quint64 currently_staked READ currently_staked)
+    Q_PROPERTY(quint64 accrued_from_current_stake READ accrued_from_current_stake)
+    Q_PROPERTY(quint64 blockchain_height READ blockchain_height)
+    Q_PROPERTY(quint64 stake_lock_period READ stake_lock_period)
     Q_PROPERTY(QString period READ period)
     Q_PROPERTY(QString payouts READ payouts)
+    Q_PROPERTY(QString burntFormatted READ burntFormatted)
+    Q_PROPERTY(QString lockedFormatted READ lockedFormatted)
+    Q_PROPERTY(QString yieldFormatted READ yieldFormatted)
+    Q_PROPERTY(QString completedYieldFormatted READ completedYieldFormatted)
+    Q_PROPERTY(QString stakedFormatted READ stakedFormatted)
+    Q_PROPERTY(QString activeYieldFormatted READ activeYieldFormatted)
 
 public:
+    // Takes ownership of the core snapshot; the wallet owns this QObject.
+    explicit YieldInfo(Monero::YieldInfo *yi, QObject *parent = nullptr);
+    ~YieldInfo() override;
     enum Status {
-        Status_Ok       = Monero::PendingTransaction::Status_Ok,
-        Status_Error    = Monero::PendingTransaction::Status_Error
+        Status_Ok       = Monero::YieldInfo::Status_Ok,
+        Status_Error    = Monero::YieldInfo::Status_Error
     };
     Q_ENUM(Status)
 
@@ -64,15 +79,23 @@ public:
     quint64 supply() const;
     quint64 yield() const;
     quint64 yield_per_stake() const;
+    quint64 total_accrued_from_past_completions() const;
+    quint64 currently_staked() const;
+    quint64 accrued_from_current_stake() const;
+    quint64 blockchain_height() const;
+    quint64 stake_lock_period() const;
     QString period() const;
     QString payouts() const;
-
-private:
-    explicit YieldInfo(Monero::YieldInfo * yi, QObject *parent = 0);
+    QString burntFormatted() const;
+    QString lockedFormatted() const;
+    QString yieldFormatted() const;
+    QString completedYieldFormatted() const;
+    QString stakedFormatted() const;
+    QString activeYieldFormatted() const;
 
 private:
     friend class Wallet;
-    Monero::YieldInfo * m_pYI;
+    std::unique_ptr<Monero::YieldInfo> m_pYI;
 };
 
 #endif // YIELDINFO_H

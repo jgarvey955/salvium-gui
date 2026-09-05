@@ -5,7 +5,10 @@ on:
 
 env:
   FREE_DISKSPACE: |
-    sudo rm -rf /usr/local/.ghcup /usr/share/dotnet /usr/share/swift /usr/share/miniconda
+    sudo rm -rf /usr/local/.ghcup 2>/dev/null || true
+    sudo rm -rf /usr/share/dotnet 2>/dev/null || true
+    sudo rm -rf /usr/share/swift 2>/dev/null || true
+    sudo rm -rf /usr/share/miniconda 2>/dev/null || true
 
 jobs:
   build-linux-static:

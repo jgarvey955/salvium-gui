@@ -175,6 +175,14 @@ Rectangle {
                     font.pixelSize: 14
                     wrapMode: TextEdit.Wrap
                     readOnly: true
+                    function escapeHtml(msg){
+                        return String(msg)
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/\"/g, "&quot;")
+                            .replace(/'/g, "&#39;");
+                    }
                     function logCommand(msg){
                         msg = log_color(msg, MoneroComponents.Style.blackTheme ? "lime" : "green");
                         consoleArea.append(msg);
@@ -187,16 +195,11 @@ Rectangle {
                         } else if (msg.toLowerCase().indexOf('warning') >= 0){
                             color = "#fa6800"
                         }
-
-                        // format multi-lines
-                        if(msg.split("\n").length >= 2){
-                            msg = msg.split("\n").join('<br>');
-                        }
-
                         log(msg, color);
                     }
                     function log_color(msg, color){
-                        return "<span style='color: " + color +  ";' >" + msg + "</span>";
+                        var safeMsg = escapeHtml(msg).replace(/\r\n|\r|\n/g, "<br>");
+                        return "<span style='color: " + color +  ";' >" + safeMsg + "</span>";
                     }
                     function log(msg, color){
                         var timestamp = Utils.formatDate(new Date(), {

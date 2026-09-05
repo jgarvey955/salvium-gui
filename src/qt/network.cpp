@@ -144,7 +144,10 @@ QString Network::get(
     const QString &contentType /* = {} */) const
 {
     const QUrl urlParsed(url);
-    httpClient->set_server(urlParsed.host().toStdString(), urlParsed.scheme() == "https" ? "443" : "80", {});
+    // Pass the complete URL so explicit HTTPS keeps certificate verification
+    // and cannot be downgraded. Plain HTTP endpoints retain TLS-first fallback.
+    if (!httpClient->set_server(url.toStdString(), {}))
+        return "invalid URL";
 
     const QString uri = (urlParsed.hasQuery() ? urlParsed.path() + "?" + urlParsed.query() : urlParsed.path());
     const http_response_info *pri = NULL;

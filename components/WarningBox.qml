@@ -7,6 +7,7 @@ import "." as MoneroComponents
 Rectangle {
     id: root
     property alias text: content.text
+    property alias textFormat: content.textFormat
     property alias textColor: content.color
     property int fontSize: 15
 
@@ -44,7 +45,7 @@ Rectangle {
             font.family: MoneroComponents.Style.fontRegular.name
             font.pixelSize: root.fontSize
             horizontalAlignment: TextInput.AlignLeft
-            textFormat: Text.RichText
+            textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             leftPadding: 4
             rightPadding: 18

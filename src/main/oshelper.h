@@ -30,8 +30,13 @@
 #define OSHELPER_H
 
 #include <QList>
+#include <QHash>
+#include <QMutex>
 #include <QObject>
+#include <QSharedPointer>
 #include <QString>
+
+class QTemporaryDir;
 /**
  * @brief The OSHelper class - exports to QML some OS-related functions
  */
@@ -60,6 +65,8 @@ public:
     static std::pair<quint8, QString> getNetworkTypeAndAddressFromFile(const QString &wallet);
 private:
     bool installed() const;
+    mutable QHash<QString, QSharedPointer<QTemporaryDir>> m_temporaryWalletDirectories;
+    mutable QMutex m_temporaryWalletMutex;
 
 signals:
 

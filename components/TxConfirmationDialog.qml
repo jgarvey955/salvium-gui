@@ -253,6 +253,7 @@ Rectangle {
                     Layout.fillWidth: true
                     font.pixelSize: 15
                     color: MoneroComponents.Style.defaultFontColor
+                    textFormat: Text.PlainText
                     text: {
                         if (currentWallet) {
                             var walletTitle = function() {
@@ -268,7 +269,7 @@ Rectangle {
                             if (appWindow.currentWallet.numSubaddressAccounts() > 1) {
                                 var currentSubaddressAccount = currentWallet.currentSubaddressAccount;
                                 var currentAccountLabel =  currentWallet.getSubaddressLabel(currentWallet.currentSubaddressAccount, 0);
-                                return walletTitle() + " (" + walletName + ")" + "<br>" + qsTr("Account #") + currentSubaddressAccount + (currentAccountLabel !== "" ? " (" + currentAccountLabel + ")" : "") + translationManager.emptyString;
+                                return walletTitle() + " (" + walletName + ")" + "\n" + qsTr("Account #") + currentSubaddressAccount + (currentAccountLabel !== "" ? " (" + currentAccountLabel + ")" : "") + translationManager.emptyString;
                             } else {
                                 return walletTitle() + " (" + walletName + ")" + translationManager.emptyString;
                             }
@@ -310,7 +311,7 @@ Rectangle {
                     selectByKeyboard: true
                     selectByMouse: true
                     selectionColor: MoneroComponents.Style.textSelectionColor
-                    textFormat: TextEdit.RichText
+                    textFormat: TextEdit.PlainText
                     wrapMode: TextEdit.Wrap
                     text: {
                         return recipients.map(function (recipient, index) {
@@ -334,8 +335,8 @@ Rectangle {
                                 }
                             }
                             const spacedaddress = recipient.address.match(/.{1,4}/g).join(' ');
-                            return title + "<br>" + spacedaddress;
-                        }).join("<br><br>");
+                            return title + "\n" + spacedaddress;
+                        }).join("\n\n");
                     }
                 }
 

@@ -27,6 +27,9 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "YieldInfo.h"
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 
 YieldInfo::Status YieldInfo::status() const
@@ -69,6 +72,19 @@ quint64 YieldInfo::yield_per_stake() const
     return m_pYI->yield_per_stake();
 }
 
+quint64 YieldInfo::total_accrued_from_past_completions() const { return m_pYI->total_accrued_from_past_completions(); }
+quint64 YieldInfo::currently_staked() const { return m_pYI->currently_staked(); }
+quint64 YieldInfo::accrued_from_current_stake() const { return m_pYI->accrued_from_current_stake(); }
+quint64 YieldInfo::blockchain_height() const { return m_pYI->blockchain_height(); }
+quint64 YieldInfo::stake_lock_period() const { return m_pYI->stake_lock_period(); }
+
+QString YieldInfo::burntFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->burnt())); }
+QString YieldInfo::lockedFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->locked())); }
+QString YieldInfo::yieldFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->yield())); }
+QString YieldInfo::completedYieldFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->total_accrued_from_past_completions())); }
+QString YieldInfo::stakedFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->currently_staked())); }
+QString YieldInfo::activeYieldFormatted() const { return QString::fromStdString(Monero::Wallet::displayAmount(m_pYI->accrued_from_current_stake())); }
+
 QString YieldInfo::period() const
 {
   // Take the number of entries and convert to a human-readable period
@@ -78,7 +94,7 @@ QString YieldInfo::period() const
 QString YieldInfo::payouts() const
 {
   std::vector<std::tuple<size_t, std::string, std::string, uint64_t, uint64_t>> raw_payouts = m_pYI->payouts();
-  QStringList result;
+  QJsonArray result;
   for (auto &rp : raw_payouts) {
     size_t height;
     std::string txid;
@@ -86,12 +102,21 @@ QString YieldInfo::payouts() const
     uint64_t burnt;
     uint64_t yield;
     std::tie(height, txid, asset_type, burnt, yield) = rp;
-    QString qtxid = QString::fromStdString(txid);
-    QString payout = tr("{\"blockheight\":%1,\"hash\":\"%2\",\"burnt\":%3,\"yield\":%4}").arg(height).arg(qtxid).arg(burnt).arg(yield);
+    QJsonObject payout;
+    payout.insert("blockheight", static_cast<qint64>(height));
+    payout.insert("hash", QString::fromStdString(txid));
+    payout.insert("asset_type", QString::fromStdString(asset_type));
+    // JSON/JavaScript numbers cannot represent all atomic amounts exactly.
+    payout.insert("burnt", QString::number(burnt));
+    payout.insert("yield", QString::number(yield));
+    payout.insert("burntFormatted", QString::fromStdString(Monero::Wallet::displayAmount(burnt)));
+    payout.insert("yieldFormatted", QString::fromStdString(Monero::Wallet::displayAmount(yield)));
     result.append(payout);
   }
-  return "[" + result.join(",") + "]";
+  return QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact));
 }
+
+YieldInfo::~YieldInfo() = default;
 
 YieldInfo::YieldInfo(Monero::YieldInfo *pt, QObject *parent)
     : QObject(parent), m_pYI(pt)

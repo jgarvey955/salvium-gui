@@ -160,6 +160,7 @@ ApplicationWindow {
         else if(seq === "Ctrl+R") middlePanel.state = "Receive"
         else if(seq === "Ctrl+H") middlePanel.state = "History"
         else if(seq === "Ctrl+B") middlePanel.state = "AddressBook"
+        else if(seq === "Ctrl+M") middlePanel.state = "Chat"
         else if(seq === "Ctrl+E") middlePanel.state = "Settings"
         else if(seq === "Ctrl+D") middlePanel.state = "Advanced"
         else if(seq === "Ctrl+T") middlePanel.state = "Account"
@@ -177,7 +178,8 @@ ApplicationWindow {
             if(middlePanel.state === "Settings") middlePanel.state = "Account"
             else if(middlePanel.state === "Account") middlePanel.state = "Transfer"
             else if(middlePanel.state === "Transfer") middlePanel.state = "AddressBook"
-            else if(middlePanel.state === "AddressBook") middlePanel.state = "Receive"
+            else if(middlePanel.state === "AddressBook") middlePanel.state = "Chat"
+            else if(middlePanel.state === "Chat") middlePanel.state = "Receive"
             else if(middlePanel.state === "Receive" && currentWallet.currentSubaddressAccount == 0) middlePanel.state = "Staking"
             else if(middlePanel.state === "Staking" && currentWallet.currentSubaddressAccount == 0) middlePanel.state = "Yield"
             else if(middlePanel.state === "Staking") middlePanel.state = "History"
@@ -201,7 +203,8 @@ ApplicationWindow {
             else if(middlePanel.state === "Yield" && currentWallet.currentSubaddressAccount == 0) middlePanel.state = "Staking"
             else if(middlePanel.state === "History") middlePanel.state = "Receive"
             else if(middlePanel.state === "Staking") middlePanel.state = "Receive"
-            else if(middlePanel.state === "Receive") middlePanel.state = "AddressBook"
+            else if(middlePanel.state === "Receive") middlePanel.state = "Chat"
+            else if(middlePanel.state === "Chat") middlePanel.state = "AddressBook"
             else if(middlePanel.state === "AddressBook") middlePanel.state = "Transfer"
             else if(middlePanel.state === "Transfer") middlePanel.state = "Account"
             else if(middlePanel.state === "Account") middlePanel.state = "Settings"
@@ -461,36 +464,16 @@ ApplicationWindow {
 
     function onUriHandler(uri){
         if(uri.startsWith("salvium://")){
-            var address = uri.substring("salvium://".length);
-
-            var params = {}
-            if(address.length === 0) return;
-            var spl = address.split("?");
-
-            if(spl.length > 2) return;
-            if(spl.length >= 1) {
-                // parse additional params
-                address = spl[0];
-
-                if(spl.length === 2){
-                    spl.shift();
-                    var item = spl[0];
-
-                    var _spl = item.split("&");
-                    for (var param in _spl){
-                        var _item = _spl[param];
-                        if(!_item.indexOf("=") > 0) continue;
-
-                        var __spl = _item.split("=");
-                        if(__spl.length !== 2) continue;
-
-                        params[__spl[0]] = __spl[1];
-                    }
-                }
-            }
+            // The desktop URI registration uses salvium:// while the wallet
+            // parser accepts the canonical salvium: form. Validate addresses,
+            // amounts, payment IDs and encoding at the final sink before
+            // changing any transaction fields.
+            var canonicalUri = "salvium:" + uri.substring("salvium://".length);
+            var parsed = walletManager.parse_uri_to_object(canonicalUri);
+            if(parsed.error) return;
 
             // Fill fields
-            middlePanel.transferView.sendTo(address, params["tx_payment_id"], params["tx_description"], params["tx_amount"]);
+            middlePanel.transferView.sendTo(parsed.address, parsed.payment_id, parsed.tx_description, parsed.amount);
 
             // Raise window
             appWindow.raise();
@@ -2112,6 +2095,11 @@ ApplicationWindow {
                     middlePanel.state = "AddressBook";
                     middlePanel.flickable.contentY = 0;
                     updateBalance();
+                }
+
+                onChatClicked: {
+                    middlePanel.state = "Chat";
+                    middlePanel.flickable.contentY = 0;
                 }
 
                 onAdvancedClicked: {

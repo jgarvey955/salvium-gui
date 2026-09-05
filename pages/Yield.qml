@@ -34,6 +34,7 @@ import QtQuick.Dialogs 1.2
 import QtGraphicalEffects 1.0
 import moneroComponents.NetworkType 1.0 
 import moneroComponents.Wallet 1.0
+import moneroComponents.YieldInfo 1.0
 import moneroComponents.WalletManager 1.0
 import moneroComponents.Clipboard 1.0
 import FontAwesome 1.0
@@ -47,7 +48,11 @@ import "../js/TxUtils.js" as TxUtils
 
 Rectangle {
     id: root
-    property var model
+    property string model: "[]"
+    property string yieldError: ""
+    property string yieldPeriod: "—"
+    property var yieldHeight: 0
+    property var stakePeriod: 0
     property int sideMargin: 50
     property var initialized: false
     property int txMax: Math.max(3, Math.floor((appWindow.height - 540) / 60))
@@ -65,6 +70,21 @@ Rectangle {
 
     Clipboard { id: clipboard }
     ListModel { id: txListViewModel }
+
+    Connections {
+        target: root.initialized ? currentWallet : null
+        onRefreshed: yieldRefresh.restart()
+    }
+
+    Timer {
+        id: yieldRefresh
+        interval: 100
+        onTriggered: {
+            if (root.initialized && currentWallet &&
+                (root.yieldError.length > 0 || currentWallet.blockchainHeight() !== root.yieldHeight))
+                root.update(root.txPage);
+        }
+    }
 
     color: "transparent"
 
@@ -86,6 +106,14 @@ Rectangle {
             text: qsTr("Yield Info") + translationManager.emptyString
         }
 
+        MoneroComponents.TextPlain {
+            visible: root.yieldError.length > 0
+            text: root.yieldError
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: MoneroComponents.Style.defaultFontColor
+        }
+
         Item {
             Layout.fillHeight: true
             Layout.fillWidth: true
@@ -95,7 +123,7 @@ Rectangle {
             Layout.topMargin: 5
     
             MoneroComponents.TextPlain {
-                text: qsTr("Supply coins burnt in last 30 days (21,600 blocks): ") + translationManager.emptyString
+                text: qsTr("Supply coins burnt over %1: ").arg(root.yieldPeriod) + translationManager.emptyString
                 Layout.fillWidth: true
                 color: MoneroComponents.Style.defaultFontColor
                 font.pixelSize: 16
@@ -137,7 +165,7 @@ Rectangle {
             Layout.topMargin: 5
 
             MoneroComponents.TextPlain {
-                text: qsTr("Yield accrued in last 30 days (21,600 blocks): ") + translationManager.emptyString
+                text: qsTr("Yield accrued over %1: ").arg(root.yieldPeriod) + translationManager.emptyString
                 Layout.fillWidth: true
                 color: MoneroComponents.Style.defaultFontColor
                 font.pixelSize: 16
@@ -294,7 +322,7 @@ Rectangle {
                 input.bottomPadding: 6
                 fontSize: 15
                 labelFontSize: 14
-                placeholderText: qsTr("Search by Transaction ID, Address, Description, Amount or Blockheight") + translationManager.emptyString
+                placeholderText: qsTr("Search by Transaction ID, Asset or Blockheight") + translationManager.emptyString
                 placeholderFontSize: 15
                 inputHeight: 34
                 onTextUpdated: {
@@ -827,7 +855,7 @@ Rectangle {
                                     visible: true
                                     font.family: MoneroComponents.Style.fontRegular.name
                                     font.pixelSize: 15
-                                    text: walletManager.displayAmount(burnt)
+                                    text: burntFormatted
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
                                     themeTransitionWhiteColor: MoneroComponents.Style._w_historyHeaderTextColor
@@ -886,7 +914,7 @@ Rectangle {
                                     visible: true
                                     font.family: MoneroComponents.Style.fontRegular.name
                                     font.pixelSize: 15
-                                    text: walletManager.displayAmount(yield)
+                                    text: yieldFormatted
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
                                     themeTransitionWhiteColor: MoneroComponents.Style._w_historyHeaderTextColor
@@ -1094,59 +1122,12 @@ Rectangle {
     }
 
     function updateFilter(currentPage){
-        // applying filters
-        root.txData = JSON.parse(JSON.stringify(root.txModelData)); // deepcopy
-        var txs = [];
-        for (var i = 0; i < root.txData.length; i++){
-            var item = root.txData[i];
-            var matched = "";
-
-            txs.push(item);
-            continue;
-
-            if (!item.height || !item.txid || !item.burnt || !item.yield) {
-                continue;
-            }
-
-            /*
-            //  filtering
-            if(item.timestamp < fromDate || item.timestamp > toDate){
-                continue;
-            }
-            */
-
-            // search string filtering
-            if(root.sortSearchString == null || root.sortSearchString === ""){
-                txs.push(root.txData[i]);
-                continue;
-            }
-
-            if(root.sortSearchString.length >= 1){
-                if(item.amount && item.amount.toString().startsWith(root.sortSearchString)){
-                    txs.push(item);
-                } else if(item.address !== "" && item.address.toLowerCase().startsWith(root.sortSearchString.toLowerCase())){
-                    txs.push(item);
-                } else if(item.receivingAddress !== "" && item.receivingAddress.toLowerCase().startsWith(root.sortSearchString.toLowerCase())){
-                    txs.push(item);
-                } else if(item.receivingAddressLabel !== "" && item.receivingAddressLabel.toLowerCase().startsWith(root.sortSearchString.toLowerCase())){
-                    txs.push(item);
-                } else if(item.addressBookName !== "" && item.addressBookName.toLowerCase().startsWith(root.sortSearchString.toLowerCase())){
-                    txs.push(item);
-                } else if(typeof item.blockheight !== "undefined" && item.blockheight.toString().startsWith(root.sortSearchString)) {
-                    txs.push(item);
-                } else if(item.tx_note.toLowerCase().indexOf(root.sortSearchString.toLowerCase()) !== -1) {
-                    txs.push(item);
-                } else if (item.hash.startsWith(root.sortSearchString)){
-                    txs.push(item);
-                } else if (root.sortSearchString.toLowerCase() == "yield" && item.tx_type == 6) {
-                    txs.push(item);
-                } else if (root.sortSearchString.toLowerCase() == "burn" && item.tx_type == 5) {
-                    txs.push(item);
-                } else if (root.sortSearchString.toLowerCase() == "miner" && item.tx_type == 1) {
-                    txs.push(item);
-                }
-            }
-        }
+        var search = (root.sortSearchString || "").toLowerCase();
+        var txs = root.txModelData.filter(function(item) {
+            return search.length === 0 || item.hash.toLowerCase().indexOf(search) !== -1 ||
+                item.asset_type.toLowerCase().indexOf(search) !== -1 ||
+                item.blockheight.toString().indexOf(search) === 0;
+        });
 
         root.txData = txs;
         root.txCount = root.txData.length;
@@ -1164,6 +1145,13 @@ Rectangle {
         root.txData.sort(function(a, b) {
             var aValue = typeof a[root.sortBy] !== "undefined" ? a[root.sortBy] : 0;
             var bValue = typeof b[root.sortBy] !== "undefined" ? b[root.sortBy] : 0;
+            if (root.sortBy === "burnt" || root.sortBy === "yield") {
+                // Atomic amounts are decimal strings, beyond JavaScript's exact integer range.
+                aValue = String(aValue);
+                bValue = String(bValue);
+                if (aValue.length !== bValue.length) return aValue.length - bValue.length;
+                return aValue === bValue ? 0 : (aValue < bValue ? -1 : 1);
+            }
             return aValue - bValue;
         });
 
@@ -1228,8 +1216,8 @@ Rectangle {
         var count = _model.length;
         root.txModelData = [];
 
-        var currentHeight = currentWallet ? currentWallet.blockchainHeight() : walletManager.blockchainHeight();
-        var stakePeriod = (persistentSettings.nettype == NetworkType.MAINNET) ? 21600 : 20;
+        var currentHeight = root.yieldHeight;
+        var stakePeriod = root.stakePeriod;
         for (var i = 0; i < count; ++i) {
             var maturityHeight = _model[i].blockheight + stakePeriod;
 
@@ -1237,9 +1225,11 @@ Rectangle {
                 "blockheight": _model[i].blockheight,
                 "currentHeight": currentHeight,
                 "maturityHeight": maturityHeight,
-                "isActive": (maturityHeight > currentHeight),
+                "isActive": (maturityHeight >= currentHeight),
                 "isComplete": (maturityHeight < currentHeight),
                 "burnt": _model[i].burnt,
+                "burntFormatted": _model[i].burntFormatted,
+                "yieldFormatted": _model[i].yieldFormatted,
                 "yield": _model[i].yield,
                 "hash": _model[i].hash,
                 "asset_type" : _model[i].asset_type
@@ -1251,9 +1241,7 @@ Rectangle {
     }
 
     function update(currentPage) {
-        // handle outside mutation of tx model; incoming/outgoing funds or new blocks. Update table.
-        //currentWallet.history.refresh(currentWallet.currentSubaddressAccount);
-
+        root.loadYieldInfo();
         root.updateTransactionsFromModel();
         root.updateFilter(currentPage);
     }
@@ -1359,32 +1347,45 @@ Rectangle {
         }
     }
 
-    function onPageCompleted() {
-        // setup date filter scope according to real transactions
-        if(appWindow.currentWallet != null){
-
-            if (persistentSettings.useRemoteNode || walletManager.localDaemonSynced()) {
-                var yield_info = currentWallet.getYieldInfo();
-                coinsBurnt.text = walletManager.displayAmount(yield_info.burnt) + " SAL1";
-                coinsLocked.text = walletManager.displayAmount(yield_info.locked) + " SAL1";
-                coinsAccrued.text = walletManager.displayAmount(yield_info.yield) + " SAL1";
-                totalAccruedFromPastCompletions.text = walletManager.displayAmount(yield_info.total_accrued_from_past_completions) + " SAL1";
-                currentlyStaked.text = walletManager.displayAmount(yield_info.currently_staked) + " SAL1";
-                accruedFromCurrentStake.text = walletManager.displayAmount(yield_info.accrued_from_current_stake) + " SAL1";
-                root.model = yield_info.payouts;
-            } else {
-                root.model = "[]";
-            }
+    function loadYieldInfo() {
+        root.model = "[]";
+        root.yieldError = "";
+        root.yieldPeriod = "—";
+        root.yieldHeight = 0;
+        root.stakePeriod = 0;
+        coinsBurnt.text = coinsLocked.text = coinsAccrued.text = "—";
+        totalAccruedFromPastCompletions.text = currentlyStaked.text = accruedFromCurrentStake.text = "—";
+        if (!currentWallet) return;
+        if (!persistentSettings.useRemoteNode && !walletManager.localDaemonSynced()) {
+            root.yieldError = qsTr("Yield information is available when the daemon is synchronized.");
+            return;
         }
+        var yield_info = currentWallet.getYieldInfo();
+        if (!yield_info || yield_info.status !== YieldInfo.Status_Ok) {
+            root.yieldError = yield_info ? yield_info.errorString : qsTr("Unable to retrieve yield information.");
+            return;
+        }
+        coinsBurnt.text = yield_info.burntFormatted + " SAL1";
+        coinsLocked.text = yield_info.lockedFormatted + " SAL1";
+        coinsAccrued.text = yield_info.yieldFormatted + " SAL1";
+        totalAccruedFromPastCompletions.text = yield_info.completedYieldFormatted + " SAL1";
+        currentlyStaked.text = yield_info.stakedFormatted + " SAL1";
+        accruedFromCurrentStake.text = yield_info.activeYieldFormatted + " SAL1";
+        root.yieldPeriod = yield_info.period;
+        root.yieldHeight = yield_info.blockchain_height;
+        root.stakePeriod = yield_info.stake_lock_period;
+        root.model = yield_info.payouts;
+    }
 
+    function onPageCompleted() {
         root.reset();
-        root.refresh();
+        root.update();
         root.initialized = true;
-        root.updateFilter();
     }
 
     function onPageClosed(){
         root.initialized = false;
+        yieldRefresh.stop();
         root.reset(true);
         root.clearFields();
     }

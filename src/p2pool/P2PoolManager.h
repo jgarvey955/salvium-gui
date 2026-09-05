@@ -48,9 +48,11 @@ public:
 
     Q_INVOKABLE bool start(const QString &flags, const QString &address, const QString &chain, const QString &threads);
     Q_INVOKABLE void exit();
-    Q_INVOKABLE bool isInstalled();
+    Q_INVOKABLE bool isInstalled() const;
     Q_INVOKABLE void getStatus();
     Q_INVOKABLE void download();
+    Q_INVOKABLE void checkForUpdates();
+    Q_INVOKABLE void update();
 
     enum DownloadError {
         BinaryNotAvailable,
@@ -68,12 +70,20 @@ signals:
     void p2poolStatus(bool isMining, int hashrate) const;
     void p2poolDownloadFailure(int errorCode) const;
     void p2poolDownloadSuccess() const;
+    void p2poolUpdateAvailable(const QString &currentVersion, const QString &latestVersion) const;
+    void p2poolUpdateNotAvailable(const QString &currentVersion) const;
+    void p2poolUpdateCheckFailure() const;
 
 private:
+    void downloadVersion(const QString &version);
+    QString currentVersion() const;
+
     std::unique_ptr<QProcess> m_p2poold;
     QMutex m_p2poolMutex;
+    QMutex m_latestVersionMutex;
     QString m_p2pool;
     QString m_p2poolPath;
+    QString m_latestVersion;
     bool started = false;
 
     mutable FutureScheduler m_scheduler;

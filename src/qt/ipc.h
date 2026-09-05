@@ -37,7 +37,7 @@ class IPC : public QObject
 {
 Q_OBJECT
 public:
-    IPC(QObject *parent = 0) : QObject(parent) {}
+    explicit IPC(QObject *parent = nullptr);
     QFileInfo socketFile() const { return m_socketFile; }
     Q_INVOKABLE QString queuedCmd() { return m_queuedCmd; }
     void SetQueuedCmd(const QString cmdString) { m_queuedCmd = cmdString; }
@@ -55,9 +55,9 @@ signals:
     void uriHandler(QString uriString);
 
 private:
-    QLocalServer *m_server;
+    QLocalServer *m_server = nullptr;
     QString m_queuedCmd;
-    QFileInfo m_socketFile = QFileInfo(QString(QDir::tempPath() + "/xmr-gui_%2.sock").arg(getAccountName()));
+    QFileInfo m_socketFile;
 };
 
 #endif // IPC_H

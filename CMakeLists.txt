@@ -4,9 +4,9 @@ project(salvium-gui)
 message(STATUS "Initiating compile using CMake ${CMAKE_VERSION}")
 
 set(VERSION_MAJOR "1")
-set(VERSION_MINOR "1")
-set(VERSION_REVISION "a")
-set(VERSION "1.${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_REVISION}")
+set(VERSION_MINOR "3")
+set(VERSION_REVISION "c")
+set(VERSION "1.${VERSION_MAJOR}.${VERSION_MINOR}${VERSION_REVISION}")
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -36,13 +36,45 @@ if(NOT MANUAL_SUBMODULES)
   if(GIT_FOUND)
     if(NOT DEV_MODE)
       function (check_submodule relative_path)
-        execute_process(COMMAND git rev-parse "HEAD" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${relative_path} OUTPUT_VARIABLE localHead)
-        execute_process(COMMAND git rev-parse "HEAD:${relative_path}" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE checkedHead)
+        execute_process(
+          COMMAND git rev-parse "HEAD"
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${relative_path}
+          OUTPUT_VARIABLE localHead
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+          RESULT_VARIABLE localHeadResult)
+        # Compare with the gitlink in the index. This accepts a deliberately
+        # staged submodule update before the outer commit is created, while an
+        # unstaged or otherwise mismatched checkout still fails the build.
+        execute_process(
+          COMMAND git rev-parse ":${relative_path}"
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+          OUTPUT_VARIABLE checkedHead
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+          RESULT_VARIABLE checkedHeadResult)
+        # A matching HEAD is insufficient if the build would consume modified
+        # or untracked source from inside the submodule. Ignored build output is
+        # excluded by git, while every source-visible difference is rejected.
+        execute_process(
+          # Validate source owned by the core repository here. Nested
+          # submodule revisions are validated by the core's own configure;
+          # asking the outer GUI checkout to inspect their worktrees causes
+          # false dirty reports on Windows (notably trezor-common).
+          COMMAND git status --porcelain --untracked-files=normal --ignore-submodules=dirty
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${relative_path}
+          OUTPUT_VARIABLE submoduleStatus
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+          RESULT_VARIABLE submoduleStatusResult)
+        if(NOT localHeadResult EQUAL 0 OR NOT checkedHeadResult EQUAL 0 OR NOT submoduleStatusResult EQUAL 0)
+          message(FATAL_ERROR "Could not resolve submodule '${relative_path}' or its staged gitlink")
+        endif()
+        if(NOT "${submoduleStatus}" STREQUAL "")
+          message(FATAL_ERROR "Submodule '${relative_path}' contains modified or untracked core source. For a clean checkout, run 'git submodule sync --recursive' and 'git submodule update --init --recursive' from the GUI repository root. Preserve or commit intentional source edits before retrying.\n${submoduleStatus}")
+        endif()
         string(COMPARE EQUAL "${localHead}" "${checkedHead}" upToDate)
         if (upToDate)
           message(STATUS "Submodule '${relative_path}' is up-to-date")
         else()
-          message(FATAL_ERROR "Submodule '${relative_path}' is not using the checked head. Please update all submodules with\ngit submodule update --init --force --recursive\nor run cmake with -DMANUAL_SUBMODULES=1,\n or if you want to build from latest master run cmake with -DDEV_MODE=ON,\n or run make devmode")
+          message(FATAL_ERROR "Submodule '${relative_path}' is not using the checked head. Please preserve intentional source edits, then run\ngit submodule sync --recursive\ngit submodule update --init --recursive\nor run cmake with -DMANUAL_SUBMODULES=1,\n or if you want to build from latest master run cmake with -DDEV_MODE=ON,\n or run make devmode")
         endif()
       endfunction ()
       message(STATUS "Checking submodules")
@@ -59,7 +91,56 @@ if(NOT MANUAL_SUBMODULES)
   endif()
 endif()
 
+if(MINGW)
+  # The core always links mx25519_static, including in the shared GUI build.
+  # Its public headers therefore need the static ABI decoration as well.
+  add_compile_definitions(MX25519_STATIC)
+
+  if(STATIC)
+    # MSYS2's static Boost.Locale was compiled against ICU's DLL ABI. Select
+    # the matching import libraries before the core discovers Boost.
+    foreach(ICU_COMPONENT icuio icuin icuuc icudt icutu)
+      find_file(GUI_ICU_${ICU_COMPONENT}_IMPORT_LIBRARY
+        NAMES lib${ICU_COMPONENT}.dll.a
+        PATH_SUFFIXES lib
+        REQUIRED)
+    endforeach()
+    set(ICU_DATA_LIBRARY_RELEASE ${GUI_ICU_icudt_IMPORT_LIBRARY} CACHE FILEPATH "" FORCE)
+    set(ICU_I18N_LIBRARY_RELEASE ${GUI_ICU_icuin_IMPORT_LIBRARY} CACHE FILEPATH "" FORCE)
+    set(ICU_UC_LIBRARY_RELEASE ${GUI_ICU_icuuc_IMPORT_LIBRARY} CACHE FILEPATH "" FORCE)
+  endif()
+endif()
+
 add_subdirectory(salvium)
+
+if(MINGW)
+  # GCC 16 intermittently ICEs or spends hours optimizing these large targets.
+  # Keep the workaround local to the top-level Windows build configuration.
+  foreach(CORE_TARGET obj_rpc obj_wallet_api daemon)
+    if(TARGET ${CORE_TARGET})
+      target_compile_options(${CORE_TARGET} PRIVATE "$<$<CONFIG:Release>:-O1>")
+    endif()
+  endforeach()
+
+  if(STATIC)
+    # Replace the core's generic ICU names, which resolve to static archives
+    # under -static, with the import libraries required by Boost.Locale.
+    foreach(CORE_TARGET simplewallet wallet_api)
+      if(TARGET ${CORE_TARGET})
+        get_target_property(CORE_LINK_LIBRARIES ${CORE_TARGET} LINK_LIBRARIES)
+        list(REMOVE_ITEM CORE_LINK_LIBRARIES icuio icuin icuuc icudt icutu)
+        list(APPEND CORE_LINK_LIBRARIES
+          ${GUI_ICU_icuio_IMPORT_LIBRARY}
+          ${GUI_ICU_icuin_IMPORT_LIBRARY}
+          ${GUI_ICU_icuuc_IMPORT_LIBRARY}
+          ${GUI_ICU_icudt_IMPORT_LIBRARY}
+          ${GUI_ICU_icutu_IMPORT_LIBRARY})
+        set_property(TARGET ${CORE_TARGET} PROPERTY LINK_LIBRARIES ${CORE_LINK_LIBRARIES})
+      endif()
+    endforeach()
+  endif()
+endif()
+
 add_subdirectory(external)
 
 set(CMAKE_AUTOMOC ON)
@@ -277,12 +358,17 @@ if(STATIC)
     qtgraphicaleffectsplugin
     qtgraphicaleffectsprivate
     qtquick2plugin
-    Qt5QmlWorkerScript
-    workerscriptplugin
     qtquickcontrolsplugin
     widgetsplugin
     windowplugin
   )
+
+  if(MINGW)
+    list(APPEND QT5_EXTRA_LIBRARIES_LIST
+      Qt5QmlWorkerScript
+      workerscriptplugin
+    )
+  endif()
 
   if(NOT ${Qt5Core_VERSION} VERSION_LESS 5.14)
      list(APPEND QT5_EXTRA_LIBRARIES_LIST qmlplugin)
@@ -490,3 +576,24 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LD_SECURITY_FLAGS} ${STA
 
 add_subdirectory(translations)
 add_subdirectory(src)
+
+option(BUILD_GUI_TESTS "Build focused GUI security regression tests" OFF)
+if(BUILD_GUI_TESTS AND UNIX)
+    enable_testing()
+    add_executable(gui_security_tests
+        tests/gui_security_tests.cpp
+        src/qt/ipc.cpp src/qt/ipc.h
+        src/libwalletqt/PassphraseHelper.cpp
+        src/libwalletqt/YieldInfo.cpp src/libwalletqt/YieldInfo.h)
+    target_include_directories(gui_security_tests PRIVATE
+        src salvium/src salvium/contrib/epee/include)
+    # Include static Qt's private dependencies without pulling in GUI plugins.
+    pkg_check_modules(GUI_TEST_QT REQUIRED Qt5Core Qt5Network Qt5Qml)
+    set(GUI_TEST_QT_LINK GUI_TEST_QT)
+    if(STATIC)
+        set(GUI_TEST_QT_LINK GUI_TEST_QT_STATIC)
+    endif()
+    target_link_libraries(gui_security_tests PRIVATE wallet_api epee
+        ${${GUI_TEST_QT_LINK}_LIBRARIES} ${${GUI_TEST_QT_LINK}_LDFLAGS_OTHER})
+    add_test(NAME gui_security_tests COMMAND gui_security_tests)
+endif()
