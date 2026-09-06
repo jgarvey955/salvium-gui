@@ -338,6 +338,11 @@ Rectangle {
         repeat: true
         running: root.visible && root.walletReady && root.serviceStatus.identityInitialized === true
         onTriggered: {
+            if (root.statusBusy || root.receiveBusy || root.sendBusy)
+                return
+            // Expire local history even while the daemon is unavailable.
+            refreshMessages()
+            refreshQuarantine()
             requestStatus(true)
         }
     }
