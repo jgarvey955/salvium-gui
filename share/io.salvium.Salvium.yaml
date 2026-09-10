@@ -146,6 +146,7 @@ modules:
       - -DCMAKE_BUILD_TYPE=Release
       - -DBUILD_TESTS=OFF
       - -DMANUAL_SUBMODULES=ON
+      - -DUSE_DEVICE_TREZOR_MANDATORY=ON
       - -DWITH_DESKTOP_ENTRY=OFF
       - -DWITH_UPDATER=OFF
     build-options:
