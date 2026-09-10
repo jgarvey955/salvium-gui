@@ -96,7 +96,7 @@ if(MINGW)
   # Its public headers therefore need the static ABI decoration as well.
   add_compile_definitions(MX25519_STATIC)
 
-  if(STATIC)
+  if(STATIC AND NOT DEPENDS)
     # MSYS2's static Boost.Locale was compiled against ICU's DLL ABI. Select
     # the matching import libraries before the core discovers Boost.
     foreach(ICU_COMPONENT icuio icuin icuuc icudt icutu)
@@ -122,7 +122,7 @@ if(MINGW)
     endif()
   endforeach()
 
-  if(STATIC)
+  if(STATIC AND NOT DEPENDS)
     # Replace the core's generic ICU names, which resolve to static archives
     # under -static, with the import libraries required by Boost.Locale.
     foreach(CORE_TARGET simplewallet wallet_api)
@@ -304,7 +304,9 @@ list(APPEND QT5_LIBRARIES
 
 if(STATIC)
 
-  set(QT5_PKG_CONFIG_Qt5Qml_PREFIX $ENV{QT5_PKG_CONFIG_Qt5Qml_PREFIX})
+  if(DEFINED ENV{QT5_PKG_CONFIG_Qt5Qml_PREFIX})
+    set(QT5_PKG_CONFIG_Qt5Qml_PREFIX $ENV{QT5_PKG_CONFIG_Qt5Qml_PREFIX})
+  endif()
   set(QT5_QML_ROOT ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/qml)
   if(EXISTS ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/share/qt5/qml)
     set(QT5_QML_ROOT ${QT5_PKG_CONFIG_Qt5Qml_PREFIX}/share/qt5/qml)
@@ -318,7 +320,6 @@ if(STATIC)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtMultimedia)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml/Models.2)
-  list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml/WorkerScript.2)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick.2)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Controls)
   list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQuick/Controls.2)
@@ -363,7 +364,10 @@ if(STATIC)
     windowplugin
   )
 
-  if(MINGW)
+  # The Docker Qt builds disable WorkerScript; MSYS2 enables it. Follow the
+  # imported Qt modules instead of requiring this optional feature by platform.
+  if(TARGET Qt5::QmlWorkerScript)
+    list(APPEND QT5_EXTRA_PATHS ${QT5_QML_ROOT}/QtQml/WorkerScript.2)
     list(APPEND QT5_EXTRA_LIBRARIES_LIST
       Qt5QmlWorkerScript
       workerscriptplugin
@@ -391,7 +395,7 @@ if(STATIC)
     ${QT5_LIBRARIES}
   )
 
-  if(MINGW)
+  if(MINGW AND TARGET Qt5::QVirtualKeyboardPlugin)
     # The MSYS2 static Qt build enables the virtual-keyboard platform plugin,
     # whose three QML plugins are not propagated by its CMake target.
     foreach(LIBRARY

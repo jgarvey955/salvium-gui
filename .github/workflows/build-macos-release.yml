@@ -50,7 +50,7 @@ jobs:
       - name: Install GUI build dependencies (Homebrew)
         run: |
           # Install all dependencies *except* qt@5
-          brew install boost@1.85 openssl@3 libsodium pkg-config cmake zeromq \
+          brew install boost openssl@3 libsodium pkg-config cmake zeromq \
                        hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
 
       - name: Clone qt repo
@@ -89,7 +89,7 @@ jobs:
       - name: Set up GUI build environment paths
         run: |
           # Point to the newly built Qt (from QT_PREFIX) and other brew dependencies
-          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost@1.85:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
           echo "${{ env.QT_PREFIX }}/bin" >> $GITHUB_PATH
 
       - name: Configure CMake (GUI)
@@ -102,8 +102,9 @@ jobs:
                 -D DEV_MODE=OFF \
                 -D MANUAL_SUBMODULES=OFF \
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \
-                -D Boost_INCLUDE_DIR=/opt/homebrew/opt/boost@1.85/include \
-                -D Boost_LIBRARY_DIR=/opt/homebrew/opt/boost@1.85/lib \
+                -D Boost_ROOT=/opt/homebrew/opt/boost \
+                -D Boost_INCLUDE_DIR=/opt/homebrew/opt/boost/include \
+                -D Boost_LIBRARY_DIR=/opt/homebrew/opt/boost/lib \
                 -D OPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3 \
                 -D OPENSSL_INCLUDE_DIR=/opt/homebrew/opt/openssl@3/include \
                 -D OPENSSL_SSL_LIBRARY=/opt/homebrew/opt/openssl@3/lib/libssl.a \
@@ -113,7 +114,7 @@ jobs:
                 -D ZMQ_INCLUDE_PATH=/opt/homebrew/opt/zeromq/include \
                 -D ZMQ_LIB=/opt/homebrew/opt/zeromq/lib/libzmq.a \
                 -D CMAKE_EXE_LINKER_FLAGS="-L/opt/homebrew/opt/openssl@3/lib" \
-                -D CMAKE_CXX_FLAGS="-I/opt/homebrew/opt/libsodium/include -I/opt/homebrew/opt/libgpg-error/include -I/opt/homebrew/opt/zeromq/include -I/opt/homebrew/opt/boost@1.85/include" \
+                -D CMAKE_CXX_FLAGS="-I/opt/homebrew/opt/libsodium/include -I/opt/homebrew/opt/libgpg-error/include -I/opt/homebrew/opt/zeromq/include -I/opt/homebrew/opt/boost/include" \
                 ../..
         env:
            CMAKE_PREFIX_PATH: ${{ env.CMAKE_PREFIX_PATH }}

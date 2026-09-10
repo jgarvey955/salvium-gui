@@ -2,7 +2,6 @@ FROM ubuntu:24.04
 
 ARG THREADS=1
 ARG QT_VERSION=v5.15.17-lts-lgpl
-ARG SALVIUM_VERSION=v1.0.6
 ENV SOURCE_DATE_EPOCH=1397818193
 
 # Install base dependencies
@@ -15,12 +14,8 @@ RUN apt update && \
 RUN update-alternatives --set x86_64-w64-mingw32-g++ $(which x86_64-w64-mingw32-g++-posix) && \
     update-alternatives --set x86_64-w64-mingw32-gcc $(which x86_64-w64-mingw32-gcc-posix)
 
-# Clone Salvium and copy the 'depends' build system
-RUN git clone --recursive https://github.com/salvium/salvium --branch ${SALVIUM_VERSION} && \
-    cd salvium && \
-    cp -a contrib/depends / && \
-    cd .. && \
-    rm -rf salvium
+# Use the dependency versions and patches pinned by the GUI's core submodule.
+COPY salvium/contrib/depends/ /depends/
 
 # Build dependencies (except Qt)
 RUN make -j$THREADS -C /depends HOST=x86_64-w64-mingw32 NO_QT=1
