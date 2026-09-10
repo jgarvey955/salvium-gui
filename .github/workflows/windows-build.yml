@@ -17,16 +17,17 @@ jobs:
           submodules: 'recursive'
           
       - name: Build Docker Image
-        run: |
-          docker build --tag salvium:build-env-windows \
-                       --build-arg THREADS=$(nproc) \
-                       -f Dockerfile.windows .
+        uses: ./.github/actions/build-docker
+        with:
+          dockerfile: Dockerfile.windows
+          image: salvium:build-env-windows
+          cache-scope: gui-deps-windows
       - name: Compile Salvium GUI
         run: |
           docker run --rm --user $(id -u):$(id -g) \
           -v "${{ github.workspace }}":/salvium-gui \
           -w /salvium-gui salvium:build-env-windows \
-          sh -c 'make depends root=/depends target=x86_64-w64-mingw32 tag=win-x64 -j$(nproc)'
+          sh -c 'USE_DEVICE_TREZOR_MANDATORY=ON make depends root=/depends target=x86_64-w64-mingw32 tag=win-x64 -j$(nproc)'
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:

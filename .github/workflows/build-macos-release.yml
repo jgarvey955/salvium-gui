@@ -57,10 +57,20 @@ jobs:
           brew install boost openssl@3 libsodium pkg-config cmake zeromq \
                        hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
 
+      # Bump the cache version when changing the Qt configure flags or tools.
+      - name: Restore static Qt toolchain
+        id: qt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.QT_PREFIX }}
+          key: qt5-static-macos-15-${{ runner.arch }}-${{ env.QT_TAG }}-v1
+
       - name: Clone qt repo
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: git clone -b "${{ env.QT_TAG }}" --recursive --depth 1 --shallow-submodules https://github.com/qt/qt5
 
       - name: Build qt from source
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: |
           cd qt5
           mkdir build && cd build
@@ -90,6 +100,13 @@ jobs:
           make -j"$(sysctl -n hw.ncpu)"
           make install
 
+      - name: Cache static Qt toolchain
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.QT_PREFIX }}
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
+
       - name: Set up GUI build environment paths
         run: |
           # Point to the newly built Qt (from QT_PREFIX) and other brew dependencies
@@ -103,6 +120,7 @@ jobs:
           /opt/homebrew/bin/cmake -D CMAKE_BUILD_TYPE=Release \
                 -D BUILD_TESTS=OFF \
                 -D STATIC=ON \
+                -D USE_DEVICE_TREZOR_MANDATORY=ON \
                 -D DEV_MODE=OFF \
                 -D MANUAL_SUBMODULES=OFF \
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \

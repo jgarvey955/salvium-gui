@@ -241,7 +241,4 @@ CMD set -ex \
     && sed -i -e "s#../salvium/external/randomx/librandomx.a##" src/CMakeFiles/salvium-wallet-gui.dir/link.txt \
     && sed -i -e "s#-lm#-lm ../salvium/external/randomx/librandomx.a#" src/CMakeFiles/salvium-wallet-gui.dir/link.txt \
     && make -j${THREADS} -C src \
-    && make -j${THREADS} apk \
-    && mkdir /salvium-apk \
-    && find /salvium-gui/build/Android/release/ -name '*.apk' -exec cp {} /salvium-apk/ \; \
-    && chown -R ${HOST_UID}:${HOST_GID} /salvium-gui
+    && make -j${THREADS} apk

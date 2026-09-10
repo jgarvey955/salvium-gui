@@ -70,10 +70,20 @@ jobs:
           brew install boost openssl@3 libsodium pkg-config cmake zeromq \
                        hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
 
+      # Bump the cache version when changing the Qt configure flags or tools.
+      - name: Restore static Qt toolchain
+        id: qt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.QT_PREFIX }}
+          key: qt5-static-macos-15-${{ runner.arch }}-${{ env.QT_TAG }}-v1
+
       - name: Clone qt repo
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: git clone -b "${{ env.QT_TAG }}" --recursive --depth 1 --shallow-submodules https://github.com/qt/qt5
 
       - name: Build qt from source
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: |
           cd qt5
           mkdir build && cd build
@@ -96,6 +106,13 @@ jobs:
           make -j"$(sysctl -n hw.ncpu)"
           make install
 
+      - name: Cache static Qt toolchain
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.QT_PREFIX }}
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
+
       - name: Set up GUI build environment paths
         run: |
           echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
@@ -108,6 +125,7 @@ jobs:
           /opt/homebrew/bin/cmake -D CMAKE_BUILD_TYPE=Release \
                 -D BUILD_TESTS=OFF \
                 -D STATIC=ON \
+                -D USE_DEVICE_TREZOR_MANDATORY=ON \
                 -D DEV_MODE=OFF \
                 -D MANUAL_SUBMODULES=OFF \
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \
@@ -202,16 +220,17 @@ jobs:
       - name: Install zip
         run: sudo apt-get update && sudo apt-get install -y zip
       - name: Build Docker Image for Windows Env
-        run: |
-          docker build --tag salvium:build-env-windows \
-                       --build-arg THREADS=$(nproc) \
-                       -f Dockerfile.windows .
+        uses: ./.github/actions/build-docker
+        with:
+          dockerfile: Dockerfile.windows
+          image: salvium:build-env-windows
+          cache-scope: gui-deps-windows
       - name: Compile Salvium GUI (Windows Target)
         run: |
           docker run --rm --user $(id -u):$(id -g) \
           -v "${{ github.workspace }}":/salvium-gui \
           -w /salvium-gui salvium:build-env-windows \
-          sh -c 'make depends root=/depends target=x86_64-w64-mingw32 tag=win-x64 -j$(nproc)'
+          sh -c 'USE_DEVICE_TREZOR_MANDATORY=ON make depends root=/depends target=x86_64-w64-mingw32 tag=win-x64 -j$(nproc)'
 
       - name: Locate Windows build outputs
         run: |
@@ -250,19 +269,18 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
-    - uses: satackey/action-docker-layer-caching@v0.0.11
-      if: "!startsWith(github.ref, 'refs/tags/v')"
-      continue-on-error: true
     - name: install packaging tools
       run: sudo apt update && sudo apt -y install zip
     - name: free up diskspace
       run: ${{env.FREE_DISKSPACE}}
     - name: prepare build environment (Docker)
-      run: docker build --tag salvium:build-env-linux --build-arg THREADS=$(nproc) --file Dockerfile.linux .
+      uses: ./.github/actions/build-docker
+      with:
+        dockerfile: Dockerfile.linux
+        image: salvium:build-env-linux
+        cache-scope: gui-deps-linux
     - name: build (inside Docker)
-      run: docker run --rm -v ${{ github.workspace }}:/salvium-gui -w /salvium-gui salvium:build-env-linux sh -c 'make release-static -j$(nproc)'
-    - name: Fix file permissions
-      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/build
+      run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e USE_DEVICE_TREZOR_MANDATORY=ON -v "${{ github.workspace }}:/salvium-gui" -w /salvium-gui salvium:build-env-linux sh -c 'make release-static -j$(nproc)'
     - name: Locate Linux build outputs
       run: |
         BIN_DIR=${{ github.workspace }}/build/release/bin
