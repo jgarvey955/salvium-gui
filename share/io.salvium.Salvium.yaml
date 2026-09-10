@@ -1,0 +1,164 @@
+app-id: io.salvium.Salvium
+runtime: org.kde.Platform
+runtime-version: 5.15-25.08
+sdk: org.kde.Sdk
+build-options:
+  cflags: -O2 -g -std=gnu11
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=all
+  - --filesystem=~/Salvium:create
+  - --persist=.salvium
+
+cleanup:
+  - /include
+  - /etc
+  - /share/man
+  - /lib/pkgconfig
+  - /lib/cmake
+  - '*.a'
+  - '*.la'
+
+command: salvium-wallet-gui
+modules:
+  - name: protobuf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -Dprotobuf_BUILD_TESTS=OFF
+      - -Dprotobuf_BUILD_SHARED_LIBS=ON
+    sources:
+      - type: git
+        url: https://github.com/protocolbuffers/protobuf
+        tag: v21.5
+        commit: ab840345966d0fa8e7100d771c92a73bfbadd25c
+
+  - name: boost
+    buildsystem: simple
+    build-commands:
+      - ./bootstrap.sh --prefix=$FLATPAK_DEST --with-libraries=chrono,date_time,filesystem,locale,program_options,regex,serialization,thread
+      - ./b2 headers
+      - ./b2 -j$FLATPAK_BUILDER_N_JOBS install variant=release --layout=system
+    sources:
+      - type: archive
+        url: https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.bz2
+        sha256: de5e6b0e4913395c6bdfa90537febd9028ea4c0735d2cdb0cd9b45d5f51264f5
+      - type: patch
+        path: ../salvium/contrib/depends/patches/boost/gcc15-wchar-from-mb-init.patch
+
+  - name: libunbound
+    config-opts:
+      - --with-libunbound-only
+    sources:
+      - type: archive
+        url: https://nlnetlabs.nl/downloads/unbound/unbound-1.25.1.tar.gz
+        sha256: 0fe8b6277b0959cfd17562debac0aa5f71e0b02dc4ffa9c60271c583edab586f
+      - type: patch
+        path: ../salvium/contrib/depends/patches/unbound/gcc15-const-correctness.patch
+
+  - name: libsodium
+    sources:
+      - type: archive
+        url: https://download.libsodium.org/libsodium/releases/libsodium-1.0.22.tar.gz
+        sha256: adbdd8f16149e81ac6078a03aca6fc03b592b89ef7b5ed83841c086191be3349
+      - type: patch
+        path: ../salvium/contrib/depends/patches/sodium/fix-whitespace.patch
+
+  - name: libusb
+    sources:
+      - type: archive
+        url: https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2
+        sha256: fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf
+
+  - name: hidapi
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: archive
+        url: https://github.com/libusb/hidapi/archive/hidapi-0.15.0.tar.gz
+        sha256: 5d84dec684c27b97b921d2f3b73218cb773cf4ea915caee317ac8fc73cef8136
+
+  - name: libzmq
+    config-opts:
+      - --with-libsodium
+      - --disable-Werror
+    sources:
+      - type: archive
+        url: https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+        sha256: 6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43
+
+  - name: libgpg-error
+    config-opts:
+      - --disable-doc
+      - --disable-tests
+    sources:
+      - type: git
+        url: https://github.com/gpg/libgpg-error.git
+        tag: libgpg-error-1.45
+        commit: dbac537e5e865fb6f3aa8596d213aa8c47a9dea1
+
+  - name: libgcrypt
+    config-opts:
+      - --disable-doc
+    sources:
+      - type: git
+        url: https://github.com/gpg/libgcrypt.git
+        tag: libgcrypt-1.10.1
+        commit: ae0e567820c37f9640440b3cff77d7c185aa6742
+
+  - name: libgss
+    sources:
+      - type: archive
+        url: https://ftp.gnu.org/gnu/gss/gss-1.0.4.tar.gz
+        sha256: ecceabdef4cae3fce7218b2ecb83eb4227dba44b53b61b8c2b2e88ae02419c73
+
+  - name: libuv
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: archive
+        url: https://github.com/libuv/libuv/archive/v1.44.2.tar.gz
+        sha256: e6e2ba8b4c349a4182a33370bb9be5e23c51b32efb9b9e209d0e8556b73a48da
+
+  - name: p2pool
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DWITH_LTO=OFF
+    sources:
+      - type: git
+        url: https://github.com/SChernykh/p2pool
+        tag: v3.2
+        commit: 92827035e07ff15da6b7645a332f3e59aa0ab1c4
+    post-install:
+      - install -Dm755 p2pool $FLATPAK_DEST/bin/p2pool
+
+  - name: salvium-gui
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTS=OFF
+      - -DMANUAL_SUBMODULES=ON
+      - -DWITH_DESKTOP_ENTRY=OFF
+      - -DWITH_UPDATER=OFF
+    build-options:
+      arch:
+        aarch64:
+          config-opts:
+            - -DARCH=armv8-a
+            - -DBUILD_TAG=linux-armv8
+        x86_64:
+          config-opts:
+            - -DARCH=default
+    sources:
+      - type: dir
+        path: ../
+    post-install:
+      - install -Dpm644 share/io.salvium.Salvium.desktop $FLATPAK_DEST/share/applications/$FLATPAK_ID.desktop
+      - install -Dpm644 share/io.salvium.Salvium.metainfo.xml $FLATPAK_DEST/share/metainfo/$FLATPAK_ID.metainfo.xml
+      - for x in 16 24 32 48 64 96 128 256; do install -Dpm644 images/appicons/${x}x${x}.png $FLATPAK_DEST/share/icons/hicolor/${x}x${x}/apps/$FLATPAK_ID.png; done

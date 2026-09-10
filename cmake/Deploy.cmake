@@ -53,23 +53,21 @@ if(APPLE OR (WIN32 AND NOT STATIC))
             )
         endif()
         
-        # libbost_filesyste-mt.dylib has a dependency on libboost_atomic-mt.dylib, maydeployqt does not copy it by itself
-        find_package(Boost COMPONENTS atomic)
-        get_target_property(BOOST_ATOMIC_LIB_PATH Boost::atomic LOCATION)
-        if(EXISTS ${BOOST_ATOMIC_LIB_PATH})
-            add_custom_command(TARGET deploy
-                               POST_BUILD
-                               COMMAND ${CMAKE_COMMAND} -E copy "${BOOST_ATOMIC_LIB_PATH}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
-                               COMMENT "Copying libboost_atomic-mt.dylib"
-            )
-        endif()
+        if(NOT STATIC)
+            # macdeployqt does not always follow Boost.Filesystem's Atomic dependency.
+            find_package(Boost CONFIG REQUIRED COMPONENTS atomic)
+            get_target_property(BOOST_ATOMIC_LIB_PATH Boost::atomic LOCATION)
+            if(EXISTS "${BOOST_ATOMIC_LIB_PATH}")
+                add_custom_command(TARGET deploy POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy "${BOOST_ATOMIC_LIB_PATH}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
+                    COMMENT "Copying Boost.Atomic runtime library")
+            endif()
 
-        # Add command to run the fix_qt_paths.py script
-        add_custom_command(TARGET deploy
-                   POST_BUILD
-                   COMMAND /usr/bin/python3 "${CMAKE_SOURCE_DIR}/share/fix_qt_paths.py" "${CMAKE_BINARY_DIR}/bin/salvium-wallet-gui.app"
-                   COMMENT "Running fix_qt_paths.py script..."
-        )
+            find_package(Python3 REQUIRED COMPONENTS Interpreter)
+            add_custom_command(TARGET deploy POST_BUILD
+                COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/share/fix_qt_paths.py" "${CMAKE_BINARY_DIR}/bin/salvium-wallet-gui.app"
+                COMMENT "Fixing bundled Qt paths")
+        endif()
 
         # Apple Silicon requires all binaries to be codesigned
         find_program(CODESIGN_EXECUTABLE NAMES codesign)

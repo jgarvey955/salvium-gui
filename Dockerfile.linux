@@ -315,3 +315,9 @@ RUN git clone -b v3.24.0 --depth 1 https://github.com/Kitware/CMake && \
     make -j$THREADS && \
     make -j$THREADS install && \
     rm -rf $(pwd)
+
+# Runtime libraries for testing the static Qt/XCB GUI inside this image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb xauth libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+    libxcb-xkb1 libxcb-shape0 libxkbcommon-x11-0 libegl1 && \
+    ldconfig && rm -rf /var/lib/apt/lists/*

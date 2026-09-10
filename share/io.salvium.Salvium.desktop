@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Salvium GUI
+GenericName=Salvium-GUI
+Comment=Salvium GUI
+Exec=salvium-wallet-gui
+Type=Application
+Terminal=false
+Categories=Network;Qt;Finance;Office;
+Icon=io.salvium.Salvium
+StartupNotify=true

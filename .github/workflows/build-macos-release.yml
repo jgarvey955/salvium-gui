@@ -5,7 +5,11 @@ on:
     inputs: # Add inputs for tag and release notes
       tag_name:
         description: 'The tag name for the release (e.g., v1.0.1)'
-        required: true
+        required: false
+      publish_release:
+        description: 'Publish the release after the build (disable for CI verification)'
+        type: boolean
+        default: true
       release_notes:
         description: 'Release notes (supports Markdown)'
         required: false
@@ -39,7 +43,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify immutable release tag
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag_name }}
         run: |
@@ -61,7 +65,7 @@ jobs:
           cd qt5
           mkdir build && cd build
           # Configure Qt, skipping modules to speed up build (flags from Monero example)
-          ../configure -prefix "${{ env.QT_PREFIX }}" -opensource -confirm-license -release -nomake examples -nomake tests -no-rpath \
+          ../configure -prefix "${{ env.QT_PREFIX }}" -opensource -confirm-license -release -static -no-framework -no-feature-qml-worker-script -nomake examples -nomake tests -no-rpath \
                        -skip qtwebengine -skip qt3d -skip qtandroidextras -skip qtcanvas3d -skip qtcharts -skip qtconnectivity \
                        -skip qtdatavis3d -skip qtdoc -skip qtgamepad -skip qtlocation -skip qtnetworkauth -skip qtpurchasing \
                        -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech \
@@ -140,11 +144,15 @@ jobs:
           cd build/release/bin
           ./salvium-wallet-gui.app/Contents/MacOS/salvium-wallet-gui --test-qml
 
+      - name: Archive macOS app bundle
+        run: tar -czf macos-app-bundle.tar.gz -C build/release/bin salvium-wallet-gui.app
+
       - name: Upload GUI App Artifact (for next job)
         uses: actions/upload-artifact@v4
         with:
           name: macos-app-bundle-local
-          path: build/release/bin/salvium-wallet-gui.app
+          path: macos-app-bundle.tar.gz
+          if-no-files-found: error
           retention-days: 1
 
   bundle-macos-release:
@@ -157,7 +165,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macos-app-bundle-local
-          path: ./salvium-wallet-gui.app
+          path: ./macos-artifact
+
+      - name: Extract macOS app bundle
+        run: tar -xzf macos-artifact/macos-app-bundle.tar.gz
 
       - name: Ensure GUI Executable has Execute Permissions
         run: |
@@ -183,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest # Can run on Linux, just needs curl/gh cli
     needs: bundle-macos-release # Depends on the DMG being created
     # Only run this job if triggered manually via workflow_dispatch
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release
     permissions:
       contents: write # Need permission to create releases
 

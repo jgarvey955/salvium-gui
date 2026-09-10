@@ -5,7 +5,11 @@ on:
     inputs:
       tag_name:
         description: 'The tag name to create (e.g., v1.0.1)'
-        required: true
+        required: false
+      publish_release:
+        description: 'Publish the release after the build (disable for CI verification)'
+        type: boolean
+        default: true
       release_notes:
         description: 'Release notes or description (supports Markdown)'
         required: false
@@ -35,10 +39,13 @@ jobs:
         id: verify
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag_name }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |
-          git check-ref-format "refs/tags/$RELEASE_TAG"
-          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
-          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          if [ "$PUBLISH_RELEASE" = "true" ]; then
+            git check-ref-format "refs/tags/$RELEASE_TAG"
+            git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          fi
           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
   build-macos-app:
@@ -70,7 +77,7 @@ jobs:
         run: |
           cd qt5
           mkdir build && cd build
-          ../configure -prefix "${{ env.QT_PREFIX }}" -opensource -confirm-license -release -nomake examples -nomake tests -no-rpath \
+          ../configure -prefix "${{ env.QT_PREFIX }}" -opensource -confirm-license -release -static -no-framework -no-feature-qml-worker-script -nomake examples -nomake tests -no-rpath \
                        -skip qtwebengine -skip qt3d -skip qtandroidextras -skip qtcanvas3d -skip qtcharts -skip qtconnectivity \
                        -skip qtdatavis3d -skip qtdoc -skip qtgamepad -skip qtlocation -skip qtnetworkauth -skip qtpurchasing \
                        -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech \
@@ -142,11 +149,15 @@ jobs:
           cd build/release/bin
           ./salvium-wallet-gui.app/Contents/MacOS/salvium-wallet-gui --test-qml
 
+      - name: Archive macOS app bundle
+        run: tar -czf macos-app-bundle.tar.gz -C build/release/bin salvium-wallet-gui.app
+
       - name: Upload GUI App Artifact (for next job)
         uses: actions/upload-artifact@v4
         with:
           name: macos-app-bundle-local
-          path: build/release/bin/salvium-wallet-gui.app
+          path: macos-app-bundle.tar.gz
+          if-no-files-found: error
           retention-days: 1
 
   bundle-macos-release:
@@ -159,7 +170,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macos-app-bundle-local
-          path: ./salvium-wallet-gui.app
+          path: ./macos-artifact
+
+      - name: Extract macOS app bundle
+        run: tar -xzf macos-artifact/macos-app-bundle.tar.gz
 
       - name: Ensure GUI Executable has Execute Permissions
         run: |
@@ -239,8 +253,8 @@ jobs:
     - uses: satackey/action-docker-layer-caching@v0.0.11
       if: "!startsWith(github.ref, 'refs/tags/v')"
       continue-on-error: true
-    - name: install host dependencies (for xvfb and zip)
-      run: sudo apt update && sudo apt -y install xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xkb1 libxcb-shape0 libxkbcommon-x11-0 libegl1 zip
+    - name: install packaging tools
+      run: sudo apt update && sudo apt -y install zip
     - name: free up diskspace
       run: ${{env.FREE_DISKSPACE}}
     - name: prepare build environment (Docker)
@@ -258,7 +272,7 @@ jobs:
         fi
         echo "BIN_DIR_PATH=$BIN_DIR" >> $GITHUB_ENV
     - name: test qml
-      run: xvfb-run -a ${{ github.workspace }}/build/release/bin/salvium-wallet-gui --test-qml
+      run: sh .github/test-qml-linux.sh
 
     - name: Create ZIP archive
       run: |
@@ -274,6 +288,7 @@ jobs:
   # --- Android job completely removed ---
 
   create-release:
+    if: inputs.publish_release
     name: Create GitHub Release
     runs-on: ubuntu-latest
     permissions:

@@ -19,13 +19,21 @@ env:
 
 jobs:
   build-macos-arm64:
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Check out code (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+
+      - name: Set up Python for macOS packaging
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install macOS packaging tools
+        run: python -m pip install macholib==1.16.4
 
       - name: Install dependencies (Homebrew)
         run: |
@@ -66,6 +74,7 @@ jobs:
         run: |
           cd build/release
           make -j$(sysctl -n hw.ncpu)
+          make deploy
 
       - name: Test QML
         if: success()
@@ -141,8 +150,6 @@ jobs:
         key: docker-linux-static-{hash}
         restore-keys: |
           docker-linux-static-
-    - name: install host dependencies (for xvfb)
-      run: sudo apt update && sudo apt -y install xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xkb1 libxcb-shape0 libxkbcommon-x11-0 libegl1
     - name: free up diskspace
       run: ${{env.FREE_DISKSPACE}}
     - name: prepare build environment (Docker)
@@ -152,7 +159,7 @@ jobs:
     - name: sha256sum Binary
       run: sha256sum build/release/bin/salvium-wallet-gui
     - name: test qml
-      run: xvfb-run -a ${{ github.workspace }}/build/release/bin/salvium-wallet-gui --test-qml
+      run: sh .github/test-qml-linux.sh
     - uses: actions/upload-artifact@v4
       with:
         name: salvium-gui-linux-x64-static

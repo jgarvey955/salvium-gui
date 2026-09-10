@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.salvium.Salvium</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <developer id="salvium.io"><name>The Salvium Project</name></developer>
+  <name>Salvium GUI</name>
+  <summary>Manage your Salvium wallet</summary>
+  <description>
+    <p>Salvium GUI is a desktop wallet for sending and receiving Salvium,
+    viewing transaction history, and managing wallet accounts.</p>
+    <p>Connect to a remote node or run a local Salvium node.</p>
+  </description>
+  <launchable type="desktop-id">io.salvium.Salvium.desktop</launchable>
+  <url type="homepage">https://salvium.io</url>
+  <url type="bugtracker">https://github.com/salvium/salvium-gui/issues</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

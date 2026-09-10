@@ -2,173 +2,74 @@ name: Flatpak
 
 on:
   release:
-    types: released
+    types: [released]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  part1:
-    name: Part 1/3
-    if: github.repository == 'salvium/salvium-gui'
-    runs-on: ubuntu-latest
+  build:
+    name: Flatpak (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
     container:
-      image: bilelmoussaoui/flatpak-github-actions:kde-5.15-22.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-5.15-25.08
       options: --privileged
     strategy:
+      fail-fast: false
       matrix:
         arch: [x86_64, aarch64]
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Install deps
-      run: dnf -y install docker
+      - name: Install Docker client for QEMU setup
+        run: dnf -y install docker
 
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
-    - name: Build flatpak
-      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-      env:
-        FLATPAK_BUILDER_N_JOBS: 3
-      with:
-        manifest-path: share/io.salvium.Salvium.yaml
-        arch: ${{ matrix.arch }}
-        cache: false
-        stop-at-module: boost
+      - name: Set package version and release date
+        env:
+          PACKAGE_VERSION: ${{ github.event.release.tag_name || github.sha }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path('share/io.salvium.Salvium.metainfo.xml')
+          tree = ET.parse(path)
+          release = tree.find('releases/release')
+          release.set('version', os.environ['PACKAGE_VERSION'].removeprefix('v'))
+          release.set('date', datetime.date.today().isoformat())
+          tree.write(path, encoding='UTF-8', xml_declaration=True)
+          PY
 
-    - name: Tar flatpak-builder
-      run: tar -cvf flatpak-builder.tar .flatpak-builder
+      - name: Build Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        env:
+          FLATPAK_BUILDER_N_JOBS: 3
+        with:
+          manifest-path: share/io.salvium.Salvium.yaml
+          arch: ${{ matrix.arch }}
+          bundle: salvium-${{ matrix.arch }}.flatpak
+          artifact-name: salvium-flatpak-${{ matrix.arch }}
+          cache: true
 
-    - name: Save flatpak-builder
-      uses: actions/upload-artifact@v3
-      with:
-        name: flatpak-builder-${{ matrix.arch }}
-        path: flatpak-builder.tar
+      - name: Validate installed metadata
+        run: appstreamcli validate --no-net flatpak_app/files/share/metainfo/io.salvium.Salvium.metainfo.xml
 
-  part2:
-    name: Part 2/3
-    if: github.repository == 'salvium/salvium-gui'
-    needs: part1
-    runs-on: ubuntu-latest
-    container:
-      image: bilelmoussaoui/flatpak-github-actions:kde-5.15-22.08
-      options: --privileged
-    strategy:
-      matrix:
-        arch: [x86_64, aarch64]
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Print binary hashes
+        working-directory: flatpak_app/files/bin
+        run: sha256sum salvium-wallet-gui salvium-wallet-cli salvium-wallet-rpc salviumd >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Install deps
-      run: dnf -y install docker
-
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-
-    - name: Restore flatpak-builder
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: flatpak-builder-${{ matrix.arch }}
-
-    - name: Untar flatpak-builder
-      run: tar -xvf flatpak-builder.tar
-
-    - name: Build flatpak
-      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-      env:
-        FLATPAK_BUILDER_N_JOBS: 3
-      with:
-        manifest-path: share/io.salvium.Salvium.yaml
-        arch: ${{ matrix.arch }}
-        cache: false
-        stop-at-module: salvium-gui
-
-    - name: Tar flatpak-builder
-      run: tar -cvf flatpak-builder.tar .flatpak-builder
-
-    - name: Save flatpak-builder
-      uses: actions/upload-artifact@v3
-      with:
-        name: flatpak-builder-${{ matrix.arch }}
-        path: flatpak-builder.tar
-
-  part3:
-    name: Part 3/3
-    if: github.repository == 'salvium/salvium-gui'
-    needs: [part1, part2]
-    runs-on: ubuntu-latest
-    container:
-      image: bilelmoussaoui/flatpak-github-actions:kde-5.15-22.08
-      options: --privileged
-    strategy:
-      matrix:
-        arch: [x86_64, aarch64]
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-
-    - name: Add version and date
-      run: |
-        sed -i 's/<version>/${{ github.event.release.tag_name }}/g' $GITHUB_WORKSPACE/share/io.salvium.Salvium.metainfo.xml
-        sed -i 's/<date>/'"$(date '+%F')"'/g' $GITHUB_WORKSPACE/share/io.salvium.Salvium.metainfo.xml
-
-    - name: Install deps
-      run: dnf -y install docker
-
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-
-    - name: Restore flatpak-builder
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: flatpak-builder-${{ matrix.arch }}
-
-    - name: Untar flatpak-builder
-      run: tar -xvf flatpak-builder.tar
-
-    - name: Build flatpak
-      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-      env:
-        FLATPAK_BUILDER_N_JOBS: 3
-      with:
-        manifest-path: share/io.salvium.Salvium.yaml
-        arch: ${{ matrix.arch }}
-        cache: false
-
-    - name: Validate AppData
-      working-directory: flatpak_app/files/share/appdata
-      run: appstream-util validate io.salvium.Salvium.appdata.xml
-
-    - name: Delete flatpak-builder
-      uses: geekyeggo/delete-artifact@v2
-      with:
-        name: flatpak-builder-${{ matrix.arch }}
-
-    - name: Print hashes
-      working-directory: flatpak_app/files/bin
-      run: |
-        echo "Hashes of the ${{ matrix.arch }} binaries:" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        for bin in salvium-blockchain-ancestry salvium-blockchain-depth salvium-blockchain-export salvium-blockchain-import salvium-blockchain-mark-spent-outputs salvium-blockchain-prune salvium-blockchain-prune-known-spent-data salvium-blockchain-stats salvium-blockchain-usage salviumd salvium-gen-ssl-cert salvium-gen-trusted-multisig salvium-wallet-cli salvium-wallet-gui salvium-wallet-rpc p2pool; do sha256sum $bin; done >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "An example command to check hashes:" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "$ flatpak run --command=sha256sum io.salvium.Salvium /app/bin/salvium-wallet-gui" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-    - name: Publish to Flathub Beta
-      uses: flatpak/flatpak-github-actions/flat-manager@v6
-      with:
-        flat-manager-url: https://hub.flathub.org
-        repository: beta
-        token: ${{ secrets.FLATHUB_ }}
+      - name: Publish to Flathub Beta
+        if: github.event_name == 'release' && github.repository == 'salvium/salvium-gui'
+        uses: flatpak/flatpak-github-actions/flat-manager@v6
+        with:
+          flat-manager-url: https://hub.flathub.org
+          repository: beta
+          token: ${{ secrets.FLATHUB_ }}
