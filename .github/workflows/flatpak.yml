@@ -11,25 +11,22 @@ permissions:
 jobs:
   build:
     name: Flatpak (${{ matrix.arch }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:kde-5.15-25.08
       options: --privileged
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install Docker client for QEMU setup
-        run: dnf -y install docker
-
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Set package version and release date
         env:
