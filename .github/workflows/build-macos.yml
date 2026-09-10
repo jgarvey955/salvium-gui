@@ -44,6 +44,7 @@ jobs:
           # --- THIS IS THE NEW FIX ---
           # Forcefully add Boost include path to CXX flags for all targets
           /opt/homebrew/bin/cmake -D CMAKE_BUILD_TYPE=Release \
+                -D Python3_EXECUTABLE="$(command -v python)" \
                 -D DEV_MODE=OFF \
                 -D MANUAL_SUBMODULES=OFF \
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \

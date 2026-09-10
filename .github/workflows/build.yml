@@ -53,6 +53,7 @@ jobs:
           mkdir -p build/release
           cd build/release
           cmake -D CMAKE_BUILD_TYPE=Release \
+                -D Python3_EXECUTABLE="$(command -v python)" \
                 -D DEV_MODE=OFF \
                 -D MANUAL_SUBMODULES=OFF \
                 -D CMAKE_POLICY_DEFAULT_CMP0074=NEW \
