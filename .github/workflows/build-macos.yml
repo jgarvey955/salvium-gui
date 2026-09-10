@@ -72,6 +72,11 @@ jobs:
           make -j$(sysctl -n hw.ncpu)
           make deploy
 
+      - name: Test QML
+        run: |
+          cd build/release/bin
+          ./salvium-wallet-gui.app/Contents/MacOS/salvium-wallet-gui --test-qml
+
       - name: Create unsigned .dmg
         if: success()
         run: |

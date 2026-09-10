@@ -54,14 +54,18 @@ if(APPLE OR (WIN32 AND NOT STATIC))
         endif()
         
         if(NOT STATIC)
-            # macdeployqt does not always follow Boost.Filesystem's Atomic dependency.
-            find_package(Boost CONFIG REQUIRED COMPONENTS atomic)
-            get_target_property(BOOST_ATOMIC_LIB_PATH Boost::atomic LOCATION)
-            if(EXISTS "${BOOST_ATOMIC_LIB_PATH}")
-                add_custom_command(TARGET deploy POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy "${BOOST_ATOMIC_LIB_PATH}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
-                    COMMENT "Copying Boost.Atomic runtime library")
-            endif()
+            # macdeployqt misses Boost dependencies referenced via @loader_path.
+            # Filesystem needs Atomic; ProgramOptions, Serialization and Thread
+            # also need Container and DateTime in current Homebrew builds.
+            find_package(Boost CONFIG REQUIRED COMPONENTS atomic container date_time)
+            foreach(_boost_runtime atomic container date_time)
+                get_target_property(_boost_runtime_path Boost::${_boost_runtime} LOCATION)
+                if(EXISTS "${_boost_runtime_path}")
+                    add_custom_command(TARGET deploy POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy "${_boost_runtime_path}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
+                        COMMENT "Copying Boost.${_boost_runtime} runtime library")
+                endif()
+            endforeach()
 
             find_package(Python3 REQUIRED COMPONENTS Interpreter)
             add_custom_command(TARGET deploy POST_BUILD
