@@ -5,26 +5,37 @@ if(APPLE OR (WIN32 AND NOT STATIC))
 
     if(APPLE AND NOT IOS)
         find_program(MACDEPLOYQT_EXECUTABLE macdeployqt HINTS "${_qt_bin_dir}")
-        add_custom_command(TARGET deploy
-                           POST_BUILD
-                           COMMAND "${MACDEPLOYQT_EXECUTABLE}" "${CMAKE_BINARY_DIR}/bin/salvium-wallet-gui.app" -always-overwrite -qmldir="${CMAKE_SOURCE_DIR}"
-                           COMMENT "Running macdeployqt..."
-        )
+        find_program(_macos_otool NAMES otool REQUIRED)
 
-        # Qt 5's macdeployqt misses Protobuf's utf8_validity runtime library.
-        # Resolve the real filename so Protobuf's versioned load path works.
+        # Seed libraries missed by Qt 5 before deployment, so macdeployqt
+        # also rewrites their dependencies to bundled libraries.
+        set(_extra_macos_runtimes)
         if(USE_DEVICE_TREZOR)
-            set(_saved_library_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
-            set(CMAKE_FIND_LIBRARY_SUFFIXES .dylib)
-            find_library(_protobuf_utf8_runtime NAMES utf8_validity)
-            set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_library_suffixes})
-            if(_protobuf_utf8_runtime)
-                get_filename_component(_protobuf_utf8_runtime_real "${_protobuf_utf8_runtime}" REALPATH)
-                add_custom_command(TARGET deploy POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_protobuf_utf8_runtime_real}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
-                    COMMENT "Copying Protobuf UTF-8 runtime library")
-            endif()
+            list(APPEND _extra_macos_runtimes utf8_validity)
         endif()
+        if(NOT STATIC)
+            list(APPEND _extra_macos_runtimes sharpyuv)
+        endif()
+        set(_saved_library_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .dylib)
+        foreach(_runtime IN LISTS _extra_macos_runtimes)
+            find_library(_macos_${_runtime}_runtime NAMES ${_runtime})
+            if(_macos_${_runtime}_runtime)
+                get_filename_component(_runtime_real "${_macos_${_runtime}_runtime}" REALPATH)
+                # The load name can differ from the full versioned filename.
+                execute_process(COMMAND "${_macos_otool}" -D "${_runtime_real}"
+                    OUTPUT_VARIABLE _runtime_install_names OUTPUT_STRIP_TRAILING_WHITESPACE
+                    COMMAND_ERROR_IS_FATAL ANY)
+                string(REGEX REPLACE ".*\n" "" _runtime_install_name "${_runtime_install_names}")
+                string(STRIP "${_runtime_install_name}" _runtime_install_name)
+                get_filename_component(_runtime_name "${_runtime_install_name}" NAME)
+                add_custom_command(TARGET deploy POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_runtime_real}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/${_runtime_name}"
+                    COMMENT "Copying ${_runtime} runtime library")
+            endif()
+        endforeach()
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_library_suffixes})
 
         # workaround for a Qt bug that requires manually adding libqsvg.dylib to bundle
         # Try to locate libqsvg.dylib in any known Qt plugin directory
@@ -49,22 +60,9 @@ if(APPLE OR (WIN32 AND NOT STATIC))
         
         if(_qt_svg_dylib)
             add_custom_command(TARGET deploy POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats"
                 COMMAND ${CMAKE_COMMAND} -E copy "${_qt_svg_dylib}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats/"
                 COMMENT "Copying libqsvg.dylib..."
-            )
-
-            get_filename_component(_qt_plugin_dir "${_qt_svg_dylib}" DIRECTORY)
-            get_filename_component(_qt_base_path "${_qt_plugin_dir}" DIRECTORY)
-            get_filename_component(_qt_base_path "${_qt_base_path}" DIRECTORY)
-
-            set(_qt_lib_dir "${_qt_base_path}/lib")
-
-            add_custom_command(TARGET deploy POST_BUILD
-                COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change "${_qt_lib_dir}/QtGui.framework/Versions/5/QtGui" "@executable_path/../Frameworks/QtGui.framework/Versions/5/QtGui" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats/libqsvg.dylib"
-                COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change "${_qt_lib_dir}/QtWidgets.framework/Versions/5/QtWidgets" "@executable_path/../Frameworks/QtWidgets.framework/Versions/5/QtWidgets" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats/libqsvg.dylib"
-                COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change "${_qt_lib_dir}/QtSvg.framework/Versions/5/QtSvg" "@executable_path/../Frameworks/QtSvg.framework/Versions/5/QtSvg" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats/libqsvg.dylib"
-                COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change "${_qt_lib_dir}/QtCore.framework/Versions/5/QtCore" "@executable_path/../Frameworks/QtCore.framework/Versions/5/QtCore" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../PlugIns/imageformats/libqsvg.dylib"
-                COMMENT "Fixing libqsvg.dylib dependency paths (dynamically)..."
             )
         endif()
         
@@ -77,11 +75,18 @@ if(APPLE OR (WIN32 AND NOT STATIC))
                 get_target_property(_boost_runtime_path Boost::${_boost_runtime} LOCATION)
                 if(EXISTS "${_boost_runtime_path}")
                     add_custom_command(TARGET deploy POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks"
                         COMMAND ${CMAKE_COMMAND} -E copy "${_boost_runtime_path}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
                         COMMENT "Copying Boost.${_boost_runtime} runtime library")
                 endif()
             endforeach()
+        endif()
 
+        add_custom_command(TARGET deploy POST_BUILD
+            COMMAND "${MACDEPLOYQT_EXECUTABLE}" "${CMAKE_BINARY_DIR}/bin/salvium-wallet-gui.app" -always-overwrite -qmldir="${CMAKE_SOURCE_DIR}"
+            COMMENT "Running macdeployqt...")
+
+        if(NOT STATIC)
             find_package(Python3 REQUIRED COMPONENTS Interpreter)
             add_custom_command(TARGET deploy POST_BUILD
                 COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/share/fix_qt_paths.py" "${CMAKE_BINARY_DIR}/bin/salvium-wallet-gui.app"

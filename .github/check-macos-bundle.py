@@ -52,28 +52,45 @@ def check_bundle(app):
             entries = list(commands(path.read_bytes()))
             if entries:
                 binaries[path] = entries
-    main_rpaths = [(value, main) for is_rpath, value in binaries[main] if is_rpath]
-
     def expand(value, binary):
         return Path(value.replace("@loader_path", str(binary.parent))
                     .replace("@executable_path", str(executable_dir))).resolve()
 
-    missing = []
-    for binary, entries in binaries.items():
-        rpaths = [(value, binary) for is_rpath, value in entries if is_rpath] + main_rpaths
+    # dyld inherits run paths along the chain that loads a library. Plugins
+    # can supply paths that are absent from both the executable and the dylib.
+    main_rpaths = [expand(value, main) for is_rpath, value in binaries[main] if is_rpath]
+    framework_dir = app / "Contents/Frameworks"
+    pending = [(path, [] if path.parent == executable_dir else main_rpaths)
+               for path in binaries if not path.is_relative_to(framework_dir)]
+    visited = set()
+    checked = set()
+    missing = set()
+    while pending:
+        binary, inherited_rpaths = pending.pop()
+        entries = binaries[binary]
+        rpaths = tuple(dict.fromkeys(
+            [expand(value, binary) for is_rpath, value in entries if is_rpath] + list(inherited_rpaths)))
+        context = binary, rpaths
+        if context in visited:
+            continue
+        visited.add(context)
+        checked.add(binary)
         for is_rpath, value in entries:
             if is_rpath or value.startswith(("/usr/lib/", "/System/Library/")):
                 continue
             if value.startswith("@rpath/"):
-                candidates = [expand(prefix, owner) / value[len("@rpath/"):]
-                              for prefix, owner in rpaths]
+                candidates = [prefix / value[len("@rpath/"):] for prefix in rpaths]
             else:
                 candidates = [expand(value, binary)]
-            if not any(path.resolve().is_relative_to(app) and path.is_file() for path in candidates):
-                missing.append(f"{binary.relative_to(app)}: {value}")
+            target = next((path.resolve() for path in candidates
+                           if path.resolve().is_relative_to(app) and path.is_file()), None)
+            if target is None:
+                missing.add(f"{binary.relative_to(app)}: {value}")
+            elif target in binaries:
+                pending.append((target, rpaths))
     if missing:
-        raise SystemExit("Unbundled library dependencies:\n" + "\n".join(missing))
-    print(f"Verified bundled dependencies for {len(binaries)} Mach-O files")
+        raise SystemExit("Unbundled library dependencies:\n" + "\n".join(sorted(missing)))
+    print(f"Verified bundled dependencies for {len(checked)} Mach-O files")
 
 
 if __name__ == "__main__":
