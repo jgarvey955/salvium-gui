@@ -70,6 +70,9 @@ jobs:
           brew install boost openssl@3 libsodium pkg-config cmake zeromq \
                        hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
 
+      - name: Build static HIDAPI
+        run: sh .github/build-hidapi-macos.sh
+
       # Bump the cache version when changing the Qt configure flags or tools.
       - name: Restore static Qt toolchain
         id: qt-cache
@@ -136,8 +139,8 @@ jobs:
                 -D OPENSSL_INCLUDE_DIR=/opt/homebrew/opt/openssl@3/include \
                 -D OPENSSL_SSL_LIBRARY=/opt/homebrew/opt/openssl@3/lib/libssl.a \
                 -D OPENSSL_CRYPTO_LIBRARY=/opt/homebrew/opt/openssl@3/lib/libcrypto.a \
-                -D HIDAPI_INCLUDE_DIR=/opt/homebrew/opt/hidapi/include \
-                -D HIDAPI_LIBRARY=/opt/homebrew/opt/hidapi/lib/libhidapi.a \
+                -D HIDAPI_INCLUDE_DIR="${{ github.workspace }}/hidapi-install/include" \
+                -D HIDAPI_LIBRARY="${{ github.workspace }}/hidapi-install/lib/libhidapi.a" \
                 -D ZMQ_INCLUDE_PATH=/opt/homebrew/opt/zeromq/include \
                 -D ZMQ_LIB=/opt/homebrew/opt/zeromq/lib/libzmq.a \
                 -D CMAKE_EXE_LINKER_FLAGS="-L/opt/homebrew/opt/openssl@3/lib" \
