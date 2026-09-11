@@ -11,7 +11,8 @@ if(APPLE AND STATIC AND NOT DEPENDS)
   # GPG error's pkg-config file omits gettext even when its static archive
   # uses libintl, as in Homebrew's macOS build.
   find_package(Intl REQUIRED)
-  list(APPEND GPG_ERROR_LIBRARIES ${Intl_LIBRARIES})
+  find_package(Iconv REQUIRED)
+  list(APPEND GPG_ERROR_LIBRARIES ${Intl_LIBRARIES} Iconv::Iconv)
 endif()
 
 add_library(openpgp
