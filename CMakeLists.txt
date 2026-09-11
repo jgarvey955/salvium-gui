@@ -275,7 +275,9 @@ if(QT5_PKG_CONFIG_FOUND)
 
   if(UNIX AND CMAKE_PREFIX_PATH)
     if(APPLE)
-      list(JOIN ${QT5_PKG_CONFIG}_LDFLAGS_OTHER " " ${QT5_PKG_CONFIG}_LDFLAGS_OTHER)
+      # Pair framework flags with their names while keeping static archives
+      # as separate link items instead of one space-separated filename.
+      string(REPLACE "-framework;" "-framework " ${QT5_PKG_CONFIG}_LDFLAGS_OTHER "${${QT5_PKG_CONFIG}_LDFLAGS_OTHER}")
     endif()
     # temporal workaround for https://bugreports.qt.io/browse/QTBUG-80922
     STRING(REPLACE "${QT5_PKG_CONFIG_Qt5Core_PREFIX}" "${QT_INSTALL_PREFIX}" ${QT5_PKG_CONFIG}_LDFLAGS_OTHER "${${QT5_PKG_CONFIG}_LDFLAGS_OTHER}")
