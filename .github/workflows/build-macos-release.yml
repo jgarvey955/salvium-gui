@@ -160,6 +160,9 @@ jobs:
           codesign --force --sign - build/release/bin/salvium-wallet-gui.app/Contents/MacOS/salviumd
           codesign --force --deep --sign - build/release/bin/salvium-wallet-gui.app
 
+      - name: Verify bundled macOS libraries
+        run: python3 .github/check-macos-bundle.py build/release/bin/salvium-wallet-gui.app
+
       - name: Test QML
         run: |
           cd build/release/bin

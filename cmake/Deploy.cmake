@@ -11,6 +11,21 @@ if(APPLE OR (WIN32 AND NOT STATIC))
                            COMMENT "Running macdeployqt..."
         )
 
+        # Qt 5's macdeployqt misses Protobuf's utf8_validity runtime library.
+        # Resolve the real filename so Protobuf's versioned load path works.
+        if(USE_DEVICE_TREZOR)
+            set(_saved_library_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+            set(CMAKE_FIND_LIBRARY_SUFFIXES .dylib)
+            find_library(_protobuf_utf8_runtime NAMES utf8_validity)
+            set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_library_suffixes})
+            if(_protobuf_utf8_runtime)
+                get_filename_component(_protobuf_utf8_runtime_real "${_protobuf_utf8_runtime}" REALPATH)
+                add_custom_command(TARGET deploy POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_protobuf_utf8_runtime_real}" "$<TARGET_FILE_DIR:salvium-wallet-gui>/../Frameworks/"
+                    COMMENT "Copying Protobuf UTF-8 runtime library")
+            endif()
+        endif()
+
         # workaround for a Qt bug that requires manually adding libqsvg.dylib to bundle
         # Try to locate libqsvg.dylib in any known Qt plugin directory
         set(_qt_plugin_search_paths)

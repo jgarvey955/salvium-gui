@@ -73,6 +73,9 @@ jobs:
           make -j$(sysctl -n hw.ncpu)
           make deploy
 
+      - name: Verify bundled macOS libraries
+        run: python3 .github/check-macos-bundle.py build/release/bin/salvium-wallet-gui.app
+
       - name: Test QML
         run: |
           cd build/release/bin
