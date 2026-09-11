@@ -211,6 +211,10 @@ RUN git clone -b v3.31.4 --depth 1 https://github.com/Kitware/CMake \
     && PATH=${HOST_PATH} make -j${THREADS} install \
     && rm -rf $(pwd)
 
+# Qt's Gradle plugin needs these build tools for APK packaging. Install them
+# before copying the SDK used by the unprivileged build container.
+RUN echo y | ${ANDROID_SDK_ROOT}/bin/sdkmanager --sdk_root=${ANDROID_SDK_ROOT} "build-tools;30.0.2" > /dev/null
+
 ENV NEW_SDK_ROOT=${WORKDIR}/sdk
 RUN mkdir ${NEW_SDK_ROOT} \
     && cp -r ${ANDROID_SDK_ROOT}/licenses ${NEW_SDK_ROOT} \
