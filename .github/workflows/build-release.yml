@@ -68,7 +68,7 @@ jobs:
       - name: Install GUI build dependencies (Homebrew)
         run: |
           brew install boost openssl@3 libsodium pkg-config cmake zeromq \
-                       hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error
+                       hidapi libpgm miniupnpc expat libunwind-headers protobuf ccache unbound libgcrypt libgpg-error gettext
 
       - name: Build static HIDAPI
         run: sh .github/build-hidapi-macos.sh
@@ -118,7 +118,7 @@ jobs:
 
       - name: Set up GUI build environment paths
         run: |
-          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=${{ env.QT_PREFIX }}:/opt/homebrew/opt/openssl@3:/opt/homebrew/opt/boost:/opt/homebrew/opt/libsodium:/opt/homebrew/opt/miniupnpc:/opt/homebrew/opt/protobuf:/opt/homebrew/opt/unbound:/opt/homebrew/opt/libgcrypt:/opt/homebrew/opt/libgpg-error:/opt/homebrew/opt/gettext:/opt/homebrew/opt/hidapi:/opt/homebrew/opt/zeromq" >> $GITHUB_ENV
           echo "${{ env.QT_PREFIX }}/bin" >> $GITHUB_PATH
 
       - name: Configure CMake (GUI)
