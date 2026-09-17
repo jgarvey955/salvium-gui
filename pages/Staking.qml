@@ -31,11 +31,7 @@ import QtQuick 2.9
 import QtQuick.Controls 1.4
 import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.2
-import moneroComponents.Clipboard 1.0
-import moneroComponents.YieldInfo 1.0
-import moneroComponents.PendingTransaction 1.0
 import moneroComponents.Wallet 1.0
-import moneroComponents.NetworkType 1.0
 import FontAwesome 1.0
 import "../components"
 import "../components" as MoneroComponents
@@ -55,6 +51,24 @@ Rectangle {
     property int mixin: 15  // (ring size 16)
     property string amount: ""
     property string warningContent: ""
+    readonly property var wallet: appWindow.currentWallet
+    property var spendableBalance: 0
+
+    // Invokable wallet methods have no QML change notification. Keep the
+    // displayed balance and amount validation in sync with wallet events.
+    function updateBalance() {
+        spendableBalance = wallet ? wallet.unlockedBalance("SAL1", 0) : 0;
+    }
+    onWalletChanged: updateBalance()
+
+    Connections {
+        target: root.wallet || null
+        onUpdated: root.updateBalance()
+        onRefreshed: root.updateBalance()
+        onHeightRefreshed: root.updateBalance()
+        onTransactionCommitted: root.updateBalance()
+    }
+
     property string stakeButtonWarning: {
         // Currently opened wallet is not view-only
         if (appWindow.viewOnly) {
@@ -63,21 +77,18 @@ Rectangle {
         }
 
         // There are sufficient unlocked funds available
-      // if (walletManager.amountFromString(amountInput.text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1") : 0)) {
-       if (walletManager.amountFromString(amountInput.text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1", 0) : 0)) {
+        if (walletManager.amountFromString(amountInput.text) > root.spendableBalance) {
             return qsTr("Amount is more than unlocked balance.") + translationManager.emptyString;
         }
 
         // Amount is nonzero
-        if (amountInput.isEmpty()) {
+        if (amountInput.isEmpty() || walletManager.amountFromString(amountInput.text) === 0) {
             return qsTr("Enter an amount.") + translationManager.emptyString;
         }
 
         return "";
     }
     property string startLinkText: "<style type='text/css'>a {text-decoration: none; color: #FF6C3C; font-size: 14px;}</style><a href='#'>(%1)</a>".arg(qsTr("Start daemon")) + translationManager.emptyString
-
-    Clipboard { id: clipboard }
 
     function oa_message(text) {
       oaPopup.title = qsTr("OpenAlias error") + translationManager.emptyString
@@ -165,7 +176,8 @@ Rectangle {
                         }
 
                         MoneroComponents.TextPlain {
-                            text: (appWindow.currentWallet ? walletManager.displayAmount(appWindow.currentWallet.unlockedBalance("SAL1", 0)) : "?.??") + " SAL1 " + translationManager.emptyString;
+                            objectName: "stakingSpendableBalance"
+                            text: (root.wallet ? walletManager.displayAmount(root.spendableBalance) : "?.??") + " SAL1 " + translationManager.emptyString;
                             Layout.rightMargin: 20
                             font.family: MoneroComponents.Style.fontMonoRegular.name;
                             font.pixelSize: 16
@@ -196,6 +208,7 @@ Rectangle {
 
                             MoneroComponents.LineEdit {
                                 id: amountInput
+                                objectName: "stakingAmountInput"
                                 KeyNavigation.backtab: parent.children[0]
                                 KeyNavigation.tab: stakeButton
                                 Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
@@ -215,6 +228,9 @@ Rectangle {
                                 placeholderLeftMargin: 10
                                 placeholderText: "0.00"
                                 text: amount
+                                error: !root.wallet || !acceptableInput ||
+                                       walletManager.amountFromString(text) === 0 ||
+                                       walletManager.amountFromString(text) > root.spendableBalance
                                 onTextChanged: {
                                     text = text.trim().replace(",", ".");
                                     const match = text.match(/^0+(\d.*)/);
@@ -228,10 +244,6 @@ Rectangle {
                                             cursorPosition = 1;
                                         }
                                     }
-                                error = (text == "") || (walletManager.amountFromString(text) == 0) || (walletManager.amountFromString(text) > (appWindow.currentWallet ? appWindow.currentWallet.unlockedBalance("SAL1", 0) : 0));
-
-                                // error = (text == "") || (walletManager.amountFromString(text) == 0) || (walletManager.amountFromString(text) > appWindow.getUnlockedBalance());
-                                    stakeButton.enabled = !error;
                                     amount = text;
                                 }
                                 validator: RegExpValidator {
@@ -251,11 +263,12 @@ Rectangle {
 
                             StandardButton {
                                 id: stakeButton
+                                objectName: "stakingSubmitButton"
                                 rightIcon: "qrc:///images/rightArrow.png"
                                 Layout.rightMargin: 4
                                 Layout.topMargin: 4
                                 text: qsTr("Stake") + translationManager.emptyString
-                                enabled: !stakeButtonWarningBox.visible && !warningContent
+                                enabled: !amountInput.error && !root.stakeButtonWarning && !root.warningContent
                                 onClicked: {
                                     console.log("Staking: stakeClicked")
                                     root.stakeClicked(root.amount, "", root.mixin, 0, "")
@@ -289,6 +302,7 @@ Rectangle {
                         Layout.bottomMargin: 10
                         MoneroComponents.WarningBox {
                             id: stakeInfoWarningBox
+                            textFormat: Text.RichText
                             text: "<style type='text/css'>a {text-decoration: none; color: #FF6C3C; font-size: 14px;}</style>" +
                                   qsTr("Staking locks your SAL1 for 21,600 blocks (about 30 days) to earn rewards. ") + translationManager.emptyString +
                                   qsTr("This lock is non-reversible. Stakers currently receive 20% of block rewards, ") + translationManager.emptyString +
@@ -303,6 +317,7 @@ Rectangle {
      // pageRoot
 
     Component.onCompleted: {
+        updateBalance();
         //Disable password page until enabled by updateStatus
         pageRoot.enabled = false
     }
@@ -310,6 +325,7 @@ Rectangle {
     // fires on every page load
     function onPageCompleted() {
         console.log("staking page loaded")
+        updateBalance();
         updateStatus();
     }
 
