@@ -45,7 +45,8 @@ import "../js/Utils.js" as Utils
 
 Rectangle {
     id: root
-    property bool privateReview: currentWallet && currentWallet.auditReviewAvailable
+    property bool privateReview: typeof currentWallet !== "undefined" &&
+                                 currentWallet !== null && currentWallet.auditReviewAvailable
     Loader {
         anchors.fill: parent
         active: root.privateReview
