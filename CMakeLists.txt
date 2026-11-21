@@ -59,7 +59,8 @@ if(NOT MANUAL_SUBMODULES)
   endif()
 endif()
 
-add_subdirectory(salvium)
+set(SALVIUM_CORE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/salvium" CACHE PATH "Salvium core source, including the audit wallet API")
+add_subdirectory("${SALVIUM_CORE_SOURCE_DIR}" salvium)
 add_subdirectory(external)
 
 set(CMAKE_AUTOMOC ON)
