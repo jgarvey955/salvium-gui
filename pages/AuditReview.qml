@@ -118,7 +118,7 @@ Item {
             enabled: !review.busy && /^[0-9a-fA-F]{64}$/.test(developer.text.trim())
             onClicked: importDialog.open()
         }
-        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#d95b4d"; text: review.errorText; visible: text.length > 0 }
+        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#d95b4d"; textFormat: Text.PlainText; text: review.errorText; visible: text.length > 0 }
         TextArea {
             Layout.fillWidth: true
             Layout.fillHeight: true
