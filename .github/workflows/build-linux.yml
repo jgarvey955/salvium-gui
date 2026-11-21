@@ -27,7 +27,6 @@ jobs:
         dockerfile: Dockerfile.linux
         image: salvium:build-env-linux
         cache-scope: gui-deps-linux
-        threads: 3
 
     - name: build
       run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e USE_DEVICE_TREZOR_MANDATORY=ON -v "${{ github.workspace }}:/salvium-gui" -w /salvium-gui salvium:build-env-linux sh -c 'make release-static -j3'
