@@ -25,3 +25,7 @@ the CMake cache may set `SALVIUM_CORE_SOURCE_DIR` to the sibling core audit sour
 and `MANUAL_SUBMODULES=ON`. Release packaging must use the reviewed audit core
 pin. The core's `docs/AUDIT_PRIVATE_REVIEW.md` defines reviewer commands,
 NonKYC reconciliation and the version 3 transport for third-party wallets.
+
+The audit submodule URL points to the review fork so a fresh checkout can fetch
+the pinned audit commit before the core PR merges. After merge, the main developer
+can repin to the reviewed official core and restore the official source URL.
