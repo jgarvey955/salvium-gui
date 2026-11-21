@@ -13,6 +13,7 @@ Item {
         var labels = {
             "CLEARED": qsTr("Verified"),
             "CLEARED_BY_DEVELOPER": qsTr("Cleared by the main developer"),
+            "CLEARANCE_PENDING": qsTr("Clearance pending chain confirmation or ordinary maturity"),
             "DENIED_BY_DEVELOPER": qsTr("Denied by the main developer"),
             "BAD": qsTr("Malformed origin found"),
             "BAD_ORIGIN_FOUND": qsTr("Malformed origin found"),
@@ -26,6 +27,14 @@ Item {
     }
 
     function reasonText(reason) {
+        var policyPrefix = "CONFIRMED_POLICY_CLEARANCE: ";
+        if (reason.indexOf(policyPrefix) === 0) {
+            var original = reason.substring(policyPrefix.length);
+            var confirmed = qsTr("Final clearance confirmed on the chain.");
+            if (original === "CONFIRMED_MALFORMED_ORIGIN" || original === "PROVEN_ILLICIT_FUNDING_REQUIRES_REVIEW")
+                return confirmed + " " + qsTr("Original finding retained for forensic accounting: ") + reasonText(original);
+            return confirmed;
+        }
         var labels = {
             "FUNDING_NOT_YET_VERIFIED": qsTr("Export a request for the main developer to verify."),
             "CONFIRMED_MALFORMED_ORIGIN": qsTr("The transaction created this asset without the required authorization."),
@@ -85,7 +94,7 @@ Item {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("You initiate an audit by exporting a request. The main developer processes it: verified funding clears automatically and uncertain cases receive a CLEAR or DENY recommendation.")
+            text: qsTr("After activation, request your audit here. The main developer processes it: verified funding and authenticated exchange purchases clear automatically. Uncertain cases receive a CLEAR or DENY recommendation for the developer's decision.")
         }
         TextField {
             id: snapshot
@@ -105,18 +114,27 @@ Item {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Audit clearance preserves ordinary spending rules and stake locks.")
+            text: qsTr("Verified outputs clear automatically without a manual decision. Your wallet picks up confirmed clearance on refresh; no import is needed. Spending is then available without an extra audit wait, subject to ordinary maturity and stake locks. Confirmed clearance is final, and later valid transfers inherit it.")
         }
+        CheckBox { id: receiptOptions; text: qsTr("Import an optional signed receipt"); enabled: !review.busy }
         TextField {
             id: developer
+            visible: receiptOptions.checked
             Layout.fillWidth: true
             placeholderText: qsTr("Main developer public key obtained independently")
             enabled: !review.busy
         }
         Button {
-            text: qsTr("Import signed result")
+            visible: receiptOptions.checked
+            text: qsTr("Import signed receipt (optional)")
             enabled: !review.busy && /^[0-9a-fA-F]{64}$/.test(developer.text.trim())
             onClicked: importDialog.open()
+        }
+        Label {
+            visible: receiptOptions.checked
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: qsTr("Import publishes only signed output authorizations. Private evidence stays private. Refresh after confirmation; an audit is needed only once for each output.")
         }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#d95b4d"; textFormat: Text.PlainText; text: review.errorText; visible: text.length > 0 }
         TextArea {
