@@ -1278,6 +1278,45 @@ QString Wallet::checkTxKey(const QString &txid, const QString &tx_key, const QSt
     return QString::fromStdString(result);
 }
 
+bool Wallet::auditReviewAvailable() const
+{
+#ifdef SALVIUM_WALLET_AUDIT_REVIEW_VERSION
+    return true;
+#else
+    return false;
+#endif
+}
+
+void Wallet::auditReviewAsync(const QString &action, const QString &fileUrl,
+    const QString &developerKey, const QString &snapshot, const QJSValue &callback)
+{
+    m_scheduler.run([this, action, fileUrl, developerKey, snapshot] {
+        QString result, error;
+        try {
+#ifdef SALVIUM_WALLET_AUDIT_REVIEW_VERSION
+            const auto url = QUrl(fileUrl);
+            const QString path = url.isLocalFile() ? url.toLocalFile() : fileUrl;
+            if (action == "export") {
+                bool ok = true;
+                const uint64_t height = snapshot.trimmed().isEmpty() ? UINT64_MAX : snapshot.toULongLong(&ok);
+                if (!ok) throw std::runtime_error("Invalid audit snapshot height");
+                if (!m_walletImpl->exportAuditReviewToFile(path.toStdString(), height))
+                    throw std::runtime_error(m_walletImpl->errorString());
+            } else if (action == "import") {
+                if (!m_walletImpl->importAuditReviewFromFile(path.toStdString(), developerKey.trimmed().toStdString()))
+                    throw std::runtime_error(m_walletImpl->errorString());
+            } else if (action != "review") throw std::runtime_error("Unknown audit action");
+            const auto report = m_walletImpl->audit(true);
+            if (report.empty()) throw std::runtime_error(m_walletImpl->errorString());
+            result = QString::fromStdString(report);
+#else
+            throw std::runtime_error("Build the GUI with the audit core to enable private review");
+#endif
+        } catch (const std::exception &e) { error = QString::fromUtf8(e.what()); }
+        return QJSValueList({result, error});
+    }, callback);
+}
+
 QString Wallet::getTxProof(const QString &txid, const QString &address, const QString &message) const
 {
     std::string result = m_walletImpl->getTxProof(txid.toStdString(), address.toStdString(), message.toStdString());

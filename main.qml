@@ -809,7 +809,7 @@ ApplicationWindow {
         // 
         if (currentWallet && daemonSynced) {
             leftPanel.isHF11 = currentWallet.useForkRules(11, 0);
-            leftPanel.isAuditHF = (currentWallet.useForkRules(6, 0) && !currentWallet.useForkRules(7, 0))
+            leftPanel.isAuditHF = currentWallet.auditReviewAvailable || (currentWallet.useForkRules(6, 0) && !currentWallet.useForkRules(7, 0))
                                || (currentWallet.useForkRules(8, 0) && !currentWallet.useForkRules(9, 0));
             leftPanel.isCarrot = currentWallet.isCarrot;
         }

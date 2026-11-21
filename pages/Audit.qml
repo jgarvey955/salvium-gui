@@ -45,6 +45,13 @@ import "../js/Utils.js" as Utils
 
 Rectangle {
     id: root
+    property bool privateReview: currentWallet && currentWallet.auditReviewAvailable
+    Loader {
+        anchors.fill: parent
+        active: root.privateReview
+        visible: active
+        source: active ? "AuditReview.qml" : ""
+    }
     signal auditClicked(int mixinCount, int priority)
 
     color: "transparent"
@@ -81,6 +88,7 @@ Rectangle {
 
     ColumnLayout {
       id: pageRoot
+      visible: !root.privateReview
       anchors.margins: 20
       anchors.topMargin: 40
 

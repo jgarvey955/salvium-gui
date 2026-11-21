@@ -111,7 +111,8 @@ if(MINGW)
   endif()
 endif()
 
-add_subdirectory(salvium)
+set(SALVIUM_CORE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/salvium" CACHE PATH "Salvium core source, including the audit wallet API")
+add_subdirectory("${SALVIUM_CORE_SOURCE_DIR}" salvium)
 
 if(MINGW)
   # GCC 16 intermittently ICEs or spends hours optimizing these large targets.

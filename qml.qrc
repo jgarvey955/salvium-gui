@@ -25,6 +25,7 @@
         <file>pages/Transfer.qml</file>
         <file>pages/Staking.qml</file>
         <file>pages/Audit.qml</file>
+        <file>pages/AuditReview.qml</file>
         <file>pages/Yield.qml</file>
         <file>pages/CreateToken.qml</file>
         <file>pages/History.qml</file>

@@ -77,6 +77,7 @@ class Wallet : public QObject, public PassprasePrompter
     Q_PROPERTY(quint32 currentSubaddressAccount READ currentSubaddressAccount NOTIFY currentSubaddressAccountChanged)
     Q_PROPERTY(bool synchronized READ synchronized)
     Q_PROPERTY(QString errorString READ errorString)
+    Q_PROPERTY(bool auditReviewAvailable READ auditReviewAvailable CONSTANT)
     Q_PROPERTY(TransactionHistory * history READ history)
     Q_PROPERTY(TransactionHistorySortFilterModel * historyModel READ historyModel NOTIFY historyModelChanged)
     Q_PROPERTY(QString path READ path)
@@ -384,6 +385,9 @@ public:
     Q_INVOKABLE QString getTxKey(const QString &txid) const;
     Q_INVOKABLE void getTxKeyAsync(const QString &txid, const QJSValue &callback);
     Q_INVOKABLE QString checkTxKey(const QString &txid, const QString &tx_key, const QString &address);
+    bool auditReviewAvailable() const;
+    Q_INVOKABLE void auditReviewAsync(const QString &action, const QString &fileUrl,
+        const QString &developerKey, const QString &snapshot, const QJSValue &callback);
     Q_INVOKABLE QString getTxProof(const QString &txid, const QString &address, const QString &message) const;
     Q_INVOKABLE void getTxProofAsync(const QString &txid, const QString &address, const QString &message, const QJSValue &callback);
     Q_INVOKABLE QString checkTxProof(const QString &txid, const QString &address, const QString &message, const QString &signature);
