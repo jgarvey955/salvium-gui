@@ -36,7 +36,7 @@ Item {
                 }
                 if (shown > 50) lines.push(qsTr("Showing 50 of %1 checked unspent outputs.").arg(shown));
                 reportText = lines.join("\n\n");
-                if (action === "export") reportText = qsTr("Private evidence saved. Share it only with your chosen reviewer.") + "\n\n" + reportText;
+                if (action === "export") reportText = qsTr("Audit request saved. Share it privately with the main developer for processing.") + "\n\n" + reportText;
             } catch (e) { errorText = qsTr("The wallet returned an invalid audit report."); }
         });
     }
@@ -49,7 +49,7 @@ Item {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Verified funding clears automatically during review. Uncertain cases receive a developer recommendation. Audit results preserve ordinary spending and stake locks.")
+            text: qsTr("You initiate an audit by exporting a request. The main developer processes it: verified funding clears automatically and uncertain cases receive a CLEAR or DENY recommendation.")
         }
         TextField {
             id: snapshot
@@ -59,7 +59,7 @@ Item {
         }
         RowLayout {
             Button { text: review.busy ? qsTr("Working…") : qsTr("Check wallet"); enabled: !review.busy; onClicked: review.run("review", "") }
-            Button { text: qsTr("Export private evidence"); enabled: !review.busy; onClicked: exportDialog.open() }
+            Button { text: qsTr("Request audit (export)"); enabled: !review.busy; onClicked: exportDialog.open() }
         }
         Label {
             Layout.fillWidth: true
@@ -69,7 +69,7 @@ Item {
         TextField {
             id: developer
             Layout.fillWidth: true
-            placeholderText: qsTr("Developer public key obtained independently")
+            placeholderText: qsTr("Main developer public key obtained independently")
             enabled: !review.busy
         }
         Button {

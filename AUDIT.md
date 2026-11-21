@@ -4,11 +4,16 @@ This repository's `audit` branch starts from `master`. Daemon, CLI and shared
 wallet verification belong to the core repository's separate `audit` branch.
 The `salvium` submodule pins the audit wallet API used by this GUI.
 
-Open **Audit**, check the wallet, and export private evidence at the snapshot
-height supplied by the coordinator. Share the file privately with the reviewer.
+The wallet owner opens **Audit**, checks the wallet, and chooses **Request audit
+(export)** at the snapshot height supplied by the main developer. Share the
+file privately with the main developer, who processes and signs the results.
 Import the signed recipient result using the developer public key obtained
 independently. The wallet verifies the signature, exported proofs, snapshot and
 revision before applying a clearance or developer decision.
+
+The main developer will supply the public authority key during private release review.
+The core intentionally leaves it unset; production result acceptance stays
+disabled until then. Owners cannot substitute their own signing authority.
 
 The page covers every account and subaddress. Evidence can disclose amounts and
 spend links. It never contains seeds or spend secrets. Audit verdicts preserve
