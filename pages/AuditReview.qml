@@ -9,6 +9,40 @@ Item {
     property string reportText: qsTr("Check your wallet, then export private evidence if verification is needed.")
     property string errorText: ""
 
+    function stateText(state) {
+        var labels = {
+            "CLEARED": qsTr("Verified"),
+            "CLEARED_BY_DEVELOPER": qsTr("Cleared by the main developer"),
+            "DENIED_BY_DEVELOPER": qsTr("Denied by the main developer"),
+            "BAD": qsTr("Malformed origin found"),
+            "BAD_ORIGIN_FOUND": qsTr("Malformed origin found"),
+            "REVIEW": qsTr("Awaiting verification"),
+            "REVIEW_REQUIRED": qsTr("Developer review needed"),
+            "AUDIT_PASSED": qsTr("Audit passed"),
+            "MATURING": qsTr("Verified; ordinary locks still apply"),
+            "EMPTY": qsTr("No supported outputs")
+        };
+        return labels[state] || state;
+    }
+
+    function reasonText(reason) {
+        var labels = {
+            "FUNDING_NOT_YET_VERIFIED": qsTr("Export a request for the main developer to verify."),
+            "CONFIRMED_MALFORMED_ORIGIN": qsTr("The transaction created this asset without the required authorization."),
+            "PROVEN_ILLICIT_FUNDING_REQUIRES_REVIEW": qsTr("Proven illicit funding requires a decision by the main developer."),
+            "MISSING_FUNDING_EVIDENCE": qsTr("More funding evidence is needed; this does not establish misconduct."),
+            "PUBLIC_VERIFICATION_WORK_LIMIT": qsTr("The verification limit was reached. More evidence or processing is needed."),
+            "MISSING_PAYOUT_AUTHORIZATION_EVIDENCE": qsTr("Historical stake payout authorization needs review."),
+            "VERIFIED_ISSUANCE": qsTr("Issuance verified."),
+            "ACCEPTED_OPENING": qsTr("Covered by the accepted earlier audit."),
+            "ALL_FUNDING_VERIFIED": qsTr("Every actual funding source was verified."),
+            "ALL_RING_CANDIDATES_VERIFIED": qsTr("Every possible funding source was verified."),
+            "PREMATURE_FUNDING": qsTr("Funding was used before its ordinary unlock height."),
+            "INVALID_ISSUANCE_OR_TRANSACTION": qsTr("An issuance or transaction defect requires review.")
+        };
+        return labels[reason] || reason;
+    }
+
     function run(action, file) {
         if (busy || !currentWallet) return;
         busy = true;
@@ -18,13 +52,15 @@ Item {
             if (error) { errorText = error; return; }
             try {
                 var report = JSON.parse(json);
-                var lines = [report.state, qsTr("Every account and subaddress in this wallet")];
+                var lines = [stateText(report.state), qsTr("Every account and subaddress in this wallet")];
                 var balances = report.balances || [];
                 for (var i = 0; i < balances.length; ++i) {
                     var b = balances[i];
                     lines.push(b.asset_type + ": " + b.good_count + qsTr(" cleared, ") +
                         b.bad_count + qsTr(" denied or malformed, ") + b.unresolved_count + qsTr(" awaiting review"));
                 }
+                lines.push(qsTr("Stake principal: %1 cleared, %2 denied or malformed, %3 awaiting review")
+                    .arg(report.stake_good_count).arg(report.stake_bad_count).arg(report.stake_unresolved_count));
                 var outputs = report.outputs || [];
                 var shown = 0;
                 for (var j = 0; j < outputs.length; ++j) {
@@ -32,7 +68,7 @@ Item {
                     if (o.spent) continue;
                     if (++shown > 50) continue;
                     lines.push(o.transaction + ":" + o.output_index + (o.stake ? " (stake)" : "") +
-                        "\n" + o.state + " — " + o.reason + (o.decision_reason ? "\n" + o.decision_reason : ""));
+                        "\n" + stateText(o.state) + " — " + reasonText(o.reason) + (o.decision_reason ? "\n" + o.decision_reason : ""));
                 }
                 if (shown > 50) lines.push(qsTr("Showing 50 of %1 checked unspent outputs.").arg(shown));
                 reportText = lines.join("\n\n");
@@ -65,6 +101,11 @@ Item {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             text: qsTr("Exported evidence contains amounts and links to spends. It stays on your computer until you choose to share the file.")
+        }
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: qsTr("Audit clearance preserves ordinary spending rules and stake locks.")
         }
         TextField {
             id: developer
