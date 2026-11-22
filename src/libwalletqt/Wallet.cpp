@@ -384,6 +384,17 @@ quint64 Wallet::unlockedBalance(const QString &asset, quint32 accountIndex) cons
     return m_walletImpl->unlockedBalance(asset.toStdString(), accountIndex);
 }
 
+QString Wallet::unlockedBalanceFormatted(const QString &asset, quint32 accountIndex) const
+{
+    return QString::fromStdString(Monero::Wallet::displayAmount(unlockedBalance(asset, accountIndex)));
+}
+
+bool Wallet::amountWithinUnlockedBalance(const QString &amount, const QString &asset, quint32 accountIndex) const
+{
+    const uint64_t parsed = Monero::Wallet::amountFromString(amount.toStdString());
+    return parsed != 0 && parsed <= unlockedBalance(asset, accountIndex);
+}
+
 quint64 Wallet::unlockedBalanceAll(const QString &asset) const
 {
     return m_walletImpl->unlockedBalanceAll(asset.toStdString());

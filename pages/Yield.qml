@@ -32,9 +32,7 @@ import QtQuick.Controls 1.4
 import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.2
 import QtGraphicalEffects 1.0
-import moneroComponents.NetworkType 1.0 
-import moneroComponents.Wallet 1.0
-import moneroComponents.WalletManager 1.0
+import moneroComponents.YieldInfo 1.0
 import moneroComponents.Clipboard 1.0
 import FontAwesome 1.0
 
@@ -47,7 +45,10 @@ import "../js/TxUtils.js" as TxUtils
 
 Rectangle {
     id: root
-    property var model
+    property string model: "[]"
+    property string yieldError: ""
+    property string yieldPeriod: "—"
+    property var yieldHeight: 0
     property int sideMargin: 50
     property var initialized: false
     property int txMax: Math.max(5, ((appWindow.height - 440) / 60))
@@ -65,6 +66,21 @@ Rectangle {
 
     Clipboard { id: clipboard }
     ListModel { id: txListViewModel }
+
+    Connections {
+        target: root.initialized ? currentWallet : null
+        onRefreshed: yieldRefresh.restart()
+    }
+    Timer {
+        id: yieldRefresh
+        interval: 100
+        onTriggered: {
+            if (root.initialized && currentWallet &&
+                (root.yieldError.length > 0 || currentWallet.blockchainHeight() !== root.yieldHeight))
+                root.update(root.txPage);
+        }
+    }
+
 
     color: "transparent"
 
@@ -85,6 +101,13 @@ Rectangle {
             fontSize: 24
             text: qsTr("Yield Info") + translationManager.emptyString
         }
+        MoneroComponents.TextPlain {
+            visible: root.yieldError.length > 0
+            text: root.yieldError
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+        }
+
 
         Item {
             Layout.fillHeight: true
@@ -95,7 +118,7 @@ Rectangle {
             Layout.topMargin: 5
     
             MoneroComponents.TextPlain {
-                text: qsTr("Supply coins burnt in last 30 days (21,600 blocks): ") + translationManager.emptyString
+                text: qsTr("Supply coins burnt over %1: ").arg(root.yieldPeriod) + translationManager.emptyString
                 Layout.fillWidth: true
                 color: MoneroComponents.Style.defaultFontColor
                 font.pixelSize: 16
@@ -137,7 +160,7 @@ Rectangle {
             Layout.topMargin: 5
 
             MoneroComponents.TextPlain {
-                text: qsTr("Yield accrued in last 30 days (21,600 blocks): ") + translationManager.emptyString
+                text: qsTr("Yield accrued over %1: ").arg(root.yieldPeriod) + translationManager.emptyString
                 Layout.fillWidth: true
                 color: MoneroComponents.Style.defaultFontColor
                 font.pixelSize: 16
@@ -614,8 +637,7 @@ Rectangle {
                                     font.pixelSize: 15
                                     text: {
                                         if (isComplete) return blockheight;
-                                        var stakePeriod = (persistentSettings.nettype == NetworkType.MAINNET) ? 21600 : 20;
-                                        return blockheight + " (" + (blockheight + stakePeriod) + ")";
+                                        return blockheight + " (" + maturityHeight + ")";
                                     }
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
@@ -675,7 +697,7 @@ Rectangle {
                                     visible: true
                                     font.family: MoneroComponents.Style.fontRegular.name
                                     font.pixelSize: 15
-                                    text: walletManager.displayAmount(burnt)
+                                    text: burntFormatted
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
                                     themeTransitionWhiteColor: MoneroComponents.Style._w_historyHeaderTextColor
@@ -734,7 +756,7 @@ Rectangle {
                                     visible: true
                                     font.family: MoneroComponents.Style.fontRegular.name
                                     font.pixelSize: 15
-                                    text: walletManager.displayAmount(yield)
+                                    text: yieldFormatted
                                     color: MoneroComponents.Style.historyHeaderTextColor
                                     themeTransitionBlackColor: MoneroComponents.Style._b_historyHeaderTextColor
                                     themeTransitionWhiteColor: MoneroComponents.Style._w_historyHeaderTextColor
@@ -1058,20 +1080,20 @@ Rectangle {
         var count = _model.length;
         root.txModelData = [];
 
-        var currentHeight = walletManager.blockchainHeight();
-        var stakePeriod = (persistentSettings.nettype == NetworkType.MAINNET) ? 21600 : 20;
-        var maturedHeight = (currentHeight > stakePeriod) ? currentHeight - stakePeriod : 0;
 
         for (var i = 0; i < count; ++i) {
 
             root.txModelData.push({"i": i,
                 "blockheight": _model[i].blockheight,
-                "isActive": (_model[i].blockheight > maturedHeight),
-                "isComplete": (_model[i].blockheight <= maturedHeight),
+                "isActive": !_model[i].isComplete,
+                "isComplete": _model[i].isComplete,
+                "maturityHeight": _model[i].maturityHeight,
+                "burntFormatted": _model[i].burntFormatted,
+                "yieldFormatted": _model[i].yieldFormatted,
                 "burnt": _model[i].burnt,
                 "yield": _model[i].yield,
                 "hash": _model[i].hash,
-                "asset_type" : _model[1].asset_type
+                "asset_type" : _model[i].asset_type
             });
         }
 
@@ -1080,6 +1102,7 @@ Rectangle {
     }
 
     function update(currentPage) {
+        root.loadYieldInfo();
         // handle outside mutation of tx model; incoming/outgoing funds or new blocks. Update table.
         //currentWallet.history.refresh(currentWallet.currentSubaddressAccount);
 
@@ -1188,29 +1211,46 @@ Rectangle {
         }
     }
 
-    function onPageCompleted() {
-        // setup date filter scope according to real transactions
-        if(appWindow.currentWallet != null){
-
-            if (persistentSettings.useRemoteNode || walletManager.localDaemonSynced()) {
-                var yield_info = currentWallet.getYieldInfo();
-                coinsBurnt.text = walletManager.displayAmount(yield_info.burnt) + " SAL1";
-                coinsLocked.text = walletManager.displayAmount(yield_info.locked) + " SAL1";
-                coinsAccrued.text = walletManager.displayAmount(yield_info.yield) + " SAL1";
-                root.model = yield_info.payouts;
-            } else {
-                root.model = "[]";
-            }
+    function loadYieldInfo() {
+        root.model = "[]";
+        root.yieldError = "";
+        root.yieldPeriod = "—";
+        coinsBurnt.text = coinsLocked.text = coinsAccrued.text = "—";
+        if (!currentWallet) return;
+        if (!persistentSettings.useRemoteNode && !walletManager.localDaemonSynced()) {
+            root.yieldError = qsTr("Yield information is available when the daemon is synchronized.");
+            return;
         }
+        var snapshot = currentWallet.getYieldInfo();
+        if (!snapshot) {
+            root.yieldError = qsTr("Unable to retrieve yield information.");
+            return;
+        }
+        try {
+            if (snapshot.status !== YieldInfo.Status_Ok) {
+                root.yieldError = snapshot.errorString;
+                return;
+            }
+            coinsBurnt.text = snapshot.burntFormatted + " SAL1";
+            coinsLocked.text = snapshot.lockedFormatted + " SAL1";
+            coinsAccrued.text = snapshot.yieldFormatted + " SAL1";
+            root.yieldPeriod = snapshot.period;
+            root.yieldHeight = snapshot.blockchain_height;
+            root.model = snapshot.payouts;
+        } finally {
+            snapshot.dispose();
+        }
+    }
 
+    function onPageCompleted() {
         root.reset();
-        root.refresh();
+        root.update();
         root.initialized = true;
-        root.updateFilter();
     }
 
     function onPageClosed(){
         root.initialized = false;
+        yieldRefresh.stop();
         root.reset(true);
         root.clearFields();
     }

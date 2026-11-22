@@ -193,6 +193,8 @@ public:
     //! returns unlocked balance
     Q_INVOKABLE quint64 unlockedBalance(const QString &asset) const;
     Q_INVOKABLE quint64 unlockedBalance(const QString &asset, quint32 accountIndex) const;
+    Q_INVOKABLE QString unlockedBalanceFormatted(const QString &asset, quint32 accountIndex) const;
+    Q_INVOKABLE bool amountWithinUnlockedBalance(const QString &amount, const QString &asset, quint32 accountIndex) const;
     Q_INVOKABLE quint64 unlockedBalanceAll(const QString &asset) const;
 
     //! account/address management
